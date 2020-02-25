@@ -18,6 +18,13 @@ namespace Lana.Entities
         [JsonProperty]
         public LavalinkSettings Lavalink { get; private set; } = new LavalinkSettings();
 
+        public async Task ReloadAsync()
+        {
+            var result = await LoadAsync();
+            this.Discord = result.Discord;
+            this.Lavalink = result.Lavalink;
+        }
+
         public static Task<LanaConfiguration> LoadAsync()
         {
             var settings = new JsonSerializerSettings
