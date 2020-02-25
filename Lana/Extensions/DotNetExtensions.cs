@@ -24,6 +24,6 @@ public static class DotNetExtensions
         else
             result += $"{ts.Milliseconds}ms";
 
-        return result;
+        return result.TrimEnd();
     }
 }
