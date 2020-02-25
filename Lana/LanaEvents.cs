@@ -69,6 +69,9 @@ namespace Lana
             if (e.Author.IsBot)
                 return Task.CompletedTask;
 
+            if(this.logChannel == null)
+                return Task.CompletedTask;
+
             _ = Task.Run(() => this.logChannel.SendMessageAsync(embed: new DiscordEmbedBuilder()
                 .WithTitle("Mensagem editada")
                 .WithColor(DiscordColor.Yellow)
@@ -81,7 +84,10 @@ namespace Lana
 
         protected Task NotifyMessageDeleted(MessageDeleteEventArgs e)
         {
-            if (e.Message.Author.IsBot)
+            if (e.Message.Author?.IsBot == true)
+                return Task.CompletedTask;
+
+            if (this.logChannel == null)
                 return Task.CompletedTask;
 
             _ = Task.Run(() => this.logChannel.SendMessageAsync(embed: new DiscordEmbedBuilder()
