@@ -13,13 +13,11 @@ namespace Lana.Attributes
     {
         public override Task<bool> ExecuteCheckAsync(CommandContext ctx, bool help)
         {
-            if (ctx.Guild == null)
-                return Task.FromResult(false);
-            else
-            {
-                var vschn = ctx.Member.VoiceState?.Channel;
-                return Task.FromResult(vschn != null);
-            }
+            if (help)
+                return Task.FromResult(true);
+
+            var vschn = ctx.Member.VoiceState?.Channel;
+            return Task.FromResult(vschn != null);
         }
     }
 }

@@ -23,7 +23,6 @@ namespace Lana
         public InteractivityExtension Interactivity { get; private set; }
         public LavalinkExtension Lavalink { get; private set; }
         public IServiceProvider Services { get; private set; }
-        public LanaEvents Events { get; private set; }
 
         public LanaBot(LanaConfiguration config)
         {
@@ -43,7 +42,7 @@ namespace Lana
 
             this.Services = new ServiceCollection()
                 .AddSingleton(this)
-                .AddSingleton(new LanaEvents())
+                .AddSingleton(new LanaEvents(this))
                 .BuildServiceProvider(true);
 
             this.CommandsNext = this.Discord.UseCommandsNext(new CommandsNextConfiguration
@@ -54,21 +53,12 @@ namespace Lana
             });
 
             this.CommandsNext.RegisterCommands(typeof(LanaBot).Assembly);
-            this.CommandsNext.CommandErrored += ProcessCommandFailed;
-
-            this.Events = Services.GetService<LanaEvents>();
-        }
-
-        Task ProcessCommandFailed(CommandErrorEventArgs e)
-        {
-            Console.WriteLine(e.Exception + "\n");
-            return Task.CompletedTask;
         }
 
         public async Task InitializeAsync()
         {
+            await this.Services.GetService<LanaEvents>().InitializeAsync();
             await this.Discord.ConnectAsync();
-            await this.Events.InitializeEventsAsync();
         }
 
         public Task ShutdownAsync()

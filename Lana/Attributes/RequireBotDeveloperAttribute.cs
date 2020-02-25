@@ -19,6 +19,9 @@ namespace Lana.Attributes
 
         public override Task<bool> ExecuteCheckAsync(CommandContext ctx, bool help)
         {
+            if (help)
+                return Task.FromResult(true);
+
             return Task.FromResult(Developers.Any(x => ctx.User.Id == x));
         }
     }

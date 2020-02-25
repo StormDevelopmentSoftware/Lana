@@ -24,7 +24,7 @@ namespace Lana.Entities.Lavalink
 
         public override bool Equals(object obj)
         {
-            return Equals(obj as TrackInfo);
+            return this.Equals(obj as TrackInfo);
         }
 
         public bool Equals(TrackInfo other)

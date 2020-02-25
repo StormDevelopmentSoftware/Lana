@@ -10,22 +10,20 @@ namespace Lana.Attributes
     {
         public override Task<bool> ExecuteCheckAsync(CommandContext ctx, bool help)
         {
-            if (ctx.Guild == null)
-                return Task.FromResult(false);
+            if (help)
+                return Task.FromResult(true);
+
+            var memberVoiceChannel = ctx.Member.VoiceState?.Channel;
+            var botVoiceChannel = ctx.Guild.CurrentMember.VoiceState?.Channel;
+
+            if (botVoiceChannel == null)
+                return Task.FromResult(true);
             else
             {
-                var memberVoiceChannel = ctx.Member.VoiceState?.Channel;
-                var botVoiceChannel = ctx.Guild.CurrentMember.VoiceState?.Channel;
+                if (memberVoiceChannel == null)
+                    return Task.FromResult(false);
 
-                if (botVoiceChannel == null)
-                    return Task.FromResult(true); // não está conectado ainda.
-                else
-                {
-                    if (memberVoiceChannel == null)
-                        return Task.FromResult(false);
-
-                    return Task.FromResult(memberVoiceChannel == botVoiceChannel);
-                }
+                return Task.FromResult(memberVoiceChannel == botVoiceChannel);
             }
         }
     }

@@ -45,7 +45,7 @@ namespace Lana.Modules
         [Command, RequireVoiceChannel, RequireSameVoiceChannel, Priority(1)]
         public async Task Play(CommandContext ctx, Uri url)
         {
-            var load_result = await this.node.Rest.GetTracksAsync(uri);
+            
         }
 
         async Task<int> PlayTrackAsync(TrackInfo track)
