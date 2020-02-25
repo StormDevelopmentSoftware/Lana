@@ -11,6 +11,7 @@ using DSharpPlus.CommandsNext;
 using DSharpPlus.CommandsNext.Attributes;
 using DSharpPlus.Lavalink;
 using DSharpPlus.Lavalink.EventArgs;
+using DSharpPlus.Net;
 using Lana.Attributes;
 using Lana.Entities.Lavalink;
 
@@ -58,15 +59,18 @@ namespace Lana.Modules
                 return;
             }
 
-            var code = await this.PlayTrackAsync(result.Info);
-            var data = result.Info.Track;
-            var message = string.Empty;
             var pos = this.tracks.Count + 1;
+            var data = result.Info.Track;
+            var op = await this.PlayTrackAsync(result.Info);
 
-            if (code == 0)
+            string message;
+
+            if (op == 0)
                 message = $"{ctx.User.Mention} :notes: Tocando agora **{Formatter.Sanitize(data.Title)}** `[{Formatter.Sanitize(data.Length.Format())}]`";
-            else if (code == 1)
+            else if (op == 1)
                 message = $"{ctx.User.Mention} :headphones: Enfileirado [`#{pos}`] **{Formatter.Sanitize(data.Title)}** `[{Formatter.Sanitize(data.Length.Format())}]`";
+            else
+                message = $"{ctx.User.Mention} :x: Lavalink não disponível!";
 
             await ctx.RespondAsync(message);
         }
@@ -77,7 +81,12 @@ namespace Lana.Modules
 
         }
 
-        async Task<int> PlayTrackAsync(TrackInfo track)
+        protected async  Task NotifyNextTrack()
+        {
+
+        }
+
+        protected async Task<int> PlayTrackAsync(TrackInfo track)
         {
             if (this.connection == null)
                 return -1;
@@ -95,7 +104,7 @@ namespace Lana.Modules
             }
         }
 
-        Task NotifyNodeDisconnected(NodeDisconnectedEventArgs e)
+        protected Task NotifyNodeDisconnected(NodeDisconnectedEventArgs e)
         {
             if (e.LavalinkNode == this.node)
                 this.connection = default;
@@ -114,6 +123,17 @@ namespace Lana.Modules
 
             if (this.node == null || !this.node.IsConnected)
                 this.node = await lavalink.ConnectAsync(this.config);
+
+            if (this.node == null || !this.node.IsConnected)
+            {
+                var objRef = lavalink.GetType().GetProperty("ConnectedNodes", BindingFlags.NonPublic | BindingFlags.Instance)
+                    .GetValue(lavalink);
+
+                ((ConcurrentDictionary<ConnectionEndpoint, LavalinkNodeConnection>)objRef)
+                    .TryRemove(this.bot.Configuration.Lavalink.RestEndpoint, out var _);
+
+                this.node = await lavalink.ConnectAsync(this.config);
+            }
 
             var botVoiceChannel = ctx.Guild.CurrentMember.VoiceState?.Channel;
             var memberVoiceChannel = ctx.Member.VoiceState?.Channel;
