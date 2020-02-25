@@ -30,6 +30,7 @@ namespace Lana
 
         public Task InitializeAsync()
         {
+            this.discord.GuildDownloadCompleted += this.NotifyGuildDownloadCompleted;
             this.discord.MessageDeleted += this.NotifyMessageDeleted;
             this.discord.MessageUpdated += this.NotifyMessageUpdated;
             this.bot.CommandsNext.CommandErrored += this.NotifyCommandFailed;
@@ -45,7 +46,7 @@ namespace Lana
             if (guild == null)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.Write("[LANA] ");
+                Console.Write("[LANA]");
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.Write(" Não foi possível determinar a guilda de moderação.\n");
                 Console.ResetColor();
