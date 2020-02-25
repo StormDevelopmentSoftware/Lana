@@ -66,7 +66,7 @@ namespace Lana
 
         protected Task NotifyMessageUpdated(MessageUpdateEventArgs e)
         {
-            if (e.Author == e.Client.CurrentUser)
+            if (e.Author.IsBot)
                 return Task.CompletedTask;
 
             _ = Task.Run(() => this.logChannel.SendMessageAsync(embed: new DiscordEmbedBuilder()
@@ -81,7 +81,7 @@ namespace Lana
 
         protected Task NotifyMessageDeleted(MessageDeleteEventArgs e)
         {
-            if (e.Message.Author == e.Client.CurrentUser)
+            if (e.Message.Author.IsBot)
                 return Task.CompletedTask;
 
             _ = Task.Run(() => this.logChannel.SendMessageAsync(embed: new DiscordEmbedBuilder()
