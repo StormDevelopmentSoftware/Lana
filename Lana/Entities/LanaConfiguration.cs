@@ -52,7 +52,7 @@ namespace Lana.Entities
                     catch(Exception ex)
                     {
                         Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.Write("[CONFIG] Failed to initialize configuration. ");
+                        Console.Write("[LANA] Inicialização da configuração falhou! ");
                         Console.ForegroundColor = ConsoleColor.Red;
                         Console.Write(ex);
                         Console.ResetColor();
