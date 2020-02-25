@@ -57,11 +57,21 @@ namespace Lana.Modules
                 this.connection = await this.node.ConnectAsync(memberVoiceChannel);
         }
 
-        [Command, RequireVoiceChannel, RequireSameVoiceChannel, Priority(0)]
+        [Command, RequireBotDeveloper]
+        public async Task Kick(CommandContext ctx)
+        {
+            if (ctx.Guild.CurrentMember.VoiceState?.Channel != null)
+            {
+                await ctx.Guild.CurrentMember.ModifyAsync(x => x.VoiceChannel = null);
+                await ctx.RespondAsync($"Bot saiu do canal de voz.");
+            }
+        }
+
+        /*[Command, RequireVoiceChannel, RequireSameVoiceChannel, Priority(0)]
         public async Task Play(CommandContext ctx, string search)
         {
 
-        }
+        }*/
 
         [Command, RequireVoiceChannel, RequireSameVoiceChannel, Priority(1)]
         public async Task Play(CommandContext ctx, Uri url)
@@ -76,19 +86,16 @@ namespace Lana.Modules
                 return;
             }
 
-            var result = loadResult.Tracks.FirstOrDefault();
+            var track = loadResult.Tracks.FirstOrDefault(x => x != null);
 
-            if (string.IsNullOrEmpty(result?.TrackString))
+            if (track == null)
             {
-                await ctx.RespondAsync($"Esta nula tentando outra.");
-
-                result = loadResult.Tracks.FirstOrDefault(x => x != null);
-
-                if (string.IsNullOrEmpty(result?.TrackString))
-                    await ctx.RespondAsync($"Esta nula tambem.");
+                await ctx.RespondAsync(":x: Esta nula!");
+                return;
             }
 
-            await this.connection.PlayAsync(result);
+            await this.connection.PlayAsync(track);
+            await ctx.RespondAsync("Tocando musica (ou deveria kkkkkk)");
         }
     }
 }
