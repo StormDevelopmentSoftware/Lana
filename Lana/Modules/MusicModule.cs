@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using DSharpPlus.CommandsNext;
 using DSharpPlus.CommandsNext.Attributes;
@@ -50,52 +51,36 @@ namespace Lana.Modules
             var memberVoiceChannel = ctx.Member.VoiceState?.Channel;
 
             if (botVoiceChannel == null && memberVoiceChannel != null)
+            {
                 this.connection = await this.node.ConnectAsync(memberVoiceChannel);
+            }
             else if (botVoiceChannel != null)
                 this.connection = this.node.GetConnection(ctx.Guild);
             else
                 this.connection = await this.node.ConnectAsync(memberVoiceChannel);
-        }
 
-        [Command, RequireBotDeveloper]
-        public async Task Kick(CommandContext ctx)
-        {
-            if (ctx.Guild.CurrentMember.VoiceState?.Channel != null)
+            if(this.connection != null && !this.connection.IsConnected)
             {
-                await ctx.Guild.CurrentMember.ModifyAsync(x => x.VoiceChannel = null);
-                await ctx.RespondAsync($"Bot saiu do canal de voz.");
+                var objRef = this.node.GetType().GetProperty("ConnectedGuilds",
+                    BindingFlags.NonPublic | BindingFlags.Instance).GetValue(this.node);
+
+                ((ConcurrentDictionary<ulong, LavalinkGuildConnection>)objRef)
+                    .TryRemove(ctx.Guild.Id, out var _);
+
+                this.connection = await this.node.ConnectAsync(memberVoiceChannel);
             }
         }
 
-        /*[Command, RequireVoiceChannel, RequireSameVoiceChannel, Priority(0)]
+        [Command, RequireVoiceChannel, RequireSameVoiceChannel, Priority(0)]
         public async Task Play(CommandContext ctx, string search)
         {
 
-        }*/
+        }
 
         [Command, RequireVoiceChannel, RequireSameVoiceChannel, Priority(1)]
         public async Task Play(CommandContext ctx, Uri url)
         {
-            var loadResult = await this.node.Rest.GetTracksAsync(url);
-
-            await ctx.RespondAsync($"status: {loadResult.LoadResultType}");
-
-            if (!loadResult.Tracks.Any())
-            {
-                await ctx.RespondAsync($"{ctx.User.Mention} :x:");
-                return;
-            }
-
-            var track = loadResult.Tracks.FirstOrDefault(x => x != null);
-
-            if (track == null)
-            {
-                await ctx.RespondAsync(":x: Esta nula!");
-                return;
-            }
-
-            await this.connection.PlayAsync(track);
-            await ctx.RespondAsync("Tocando musica (ou deveria kkkkkk)");
+            
         }
     }
 }
