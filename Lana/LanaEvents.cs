@@ -138,7 +138,8 @@ namespace Lana
                     ["Canal"] = $"#{ctx.Channel.Name}",
                     ["Guild"] = ctx.Guild.Name,
                     ["Descrição"] = ex.Message,
-                    ["Classe"] = ex.GetType().FullName
+                    ["Classe"] = ex.GetType().FullName,
+                    ["StackTrace"] = ex.StackTrace + "\n"
                 };
 
                 foreach (var (key, value) in props)
