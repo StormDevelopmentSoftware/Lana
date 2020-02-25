@@ -52,6 +52,7 @@ namespace Lana
                 Services = this.Services
             });
 
+            this.CommandsNext.SetHelpFormatter<LanaHelpFormatter>();
             this.CommandsNext.RegisterCommands(typeof(LanaBot).Assembly);
         }
 
