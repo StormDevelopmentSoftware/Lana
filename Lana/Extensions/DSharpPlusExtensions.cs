@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using DSharpPlus.CommandsNext.Attributes;
 using DSharpPlus.CommandsNext.Exceptions;
+using DSharpPlus.Entities;
 
 public static class DSharpPlusExtensions
 {
@@ -20,4 +22,20 @@ public static class DSharpPlusExtensions
     {
         return TryGetFailedCheck<TFailedCheck>(exception, obj: out var _);
     }
+
+    public static DiscordEmoji LookupEmoji(string name)
+    {
+        var objRef = typeof(DiscordEmoji).GetProperty("UnicodeEmojis", BindingFlags.NonPublic | BindingFlags.Static)
+            .GetValue(null);
+
+        var dictionary = ((IReadOnlyDictionary<string, string>)objRef);
+
+        if (!dictionary.TryGetValue(name, out var entity))
+            return default;
+
+        return DiscordEmoji.FromUnicode(entity);
+    }
+
+    public static string Format(this DiscordUser user)
+        => $"{user.Username}#{user.Discriminator}";
 }

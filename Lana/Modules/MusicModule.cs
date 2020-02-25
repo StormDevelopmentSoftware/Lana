@@ -2,9 +2,11 @@
 
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using DSharpPlus;
 using DSharpPlus.CommandsNext;
 using DSharpPlus.CommandsNext.Attributes;
 using DSharpPlus.Lavalink;
@@ -37,15 +39,42 @@ namespace Lana.Modules
             => this.config = new LavalinkConfiguration(this.bot.Configuration.Lavalink.Build());
 
         [Command, RequireVoiceChannel, RequireSameVoiceChannel, Priority(0)]
-        public async Task Play(CommandContext ctx, string search)
+        public async Task Play(CommandContext ctx, [RemainingText] string search)
         {
+            var response = await this.node.Rest.GetTracksAsync(search, LavalinkSearchType.Youtube);
 
+            if (response.Tracks?.Count() == 0)
+            {
+                await ctx.RespondAsync($"{ctx.User.Mention} :x: Nenhum resultado encontrado para `{Formatter.Sanitize(search)}`");
+                return;
+            }
+
+            var selector = new TrackSelector(ctx, response.Tracks, search);
+            var result = await selector.SelectAsync();
+
+            if (result.TimedOut)
+            {
+                await ctx.RespondAsync($"{ctx.User.Mention} :x: Tempo limite esgotado.");
+                return;
+            }
+
+            var code = await this.PlayTrackAsync(result.Info);
+            var data = result.Info.Track;
+            var message = string.Empty;
+            var pos = this.tracks.Count + 1;
+
+            if (code == 0)
+                message = $"{ctx.User.Mention} :notes: Tocando agora **{Formatter.Sanitize(data.Title)}** `[{Formatter.Sanitize(data.Length.Format())}]`";
+            else if (code == 1)
+                message = $"{ctx.User.Mention} :headphones: Enfileirado [`#{pos}`] **{Formatter.Sanitize(data.Title)}** `[{Formatter.Sanitize(data.Length.Format())}]`";
+
+            await ctx.RespondAsync(message);
         }
 
         [Command, RequireVoiceChannel, RequireSameVoiceChannel, Priority(1)]
         public async Task Play(CommandContext ctx, Uri url)
         {
-            
+
         }
 
         async Task<int> PlayTrackAsync(TrackInfo track)
