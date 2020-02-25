@@ -126,8 +126,8 @@ namespace Lana.Modules
 
             if (this.node == null || !this.node.IsConnected)
             {
-                var objRef = lavalink.GetType().GetProperty("ConnectedNodes", BindingFlags.NonPublic | BindingFlags.Instance)
-                    .GetValue(lavalink);
+                var objRef = lavalink.GetType().GetProperty("ConnectedNodes",
+                    BindingFlags.NonPublic | BindingFlags.Instance).GetValue(lavalink);
 
                 ((ConcurrentDictionary<ConnectionEndpoint, LavalinkNodeConnection>)objRef)
                     .TryRemove(this.bot.Configuration.Lavalink.RestEndpoint, out var _);
