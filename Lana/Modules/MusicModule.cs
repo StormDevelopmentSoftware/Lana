@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using DSharpPlus.CommandsNext;
 using DSharpPlus.CommandsNext.Attributes;
 using DSharpPlus.Lavalink;
+using DSharpPlus.Lavalink.EventArgs;
 using Lana.Attributes;
 using Lana.Entities.Lavalink;
 
@@ -23,7 +24,16 @@ namespace Lana.Modules
         public MusicModule(LanaBot bot)
         {
             this.bot = bot;
+            this.bot.Lavalink.NodeDisconnected += this.ProcessNodeDisconnected;
             this.config = new LavalinkConfiguration(this.bot.Configuration.Lavalink.Build());
+        }
+
+        Task ProcessNodeDisconnected(NodeDisconnectedEventArgs e)
+        {
+            if (e.LavalinkNode == this.node)
+                this.connection = default;
+
+            return Task.CompletedTask;
         }
 
         public override async Task BeforeExecutionAsync(CommandContext ctx)
@@ -41,6 +51,10 @@ namespace Lana.Modules
 
             if (botVoiceChannel == null && memberVoiceChannel != null)
                 this.connection = await this.node.ConnectAsync(memberVoiceChannel);
+            else if (botVoiceChannel != null)
+                this.connection = this.node.GetConnection(ctx.Guild);
+            else
+                this.connection = await this.node.ConnectAsync(memberVoiceChannel);
         }
 
         [Command, RequireVoiceChannel, RequireSameVoiceChannel, Priority(0)]
@@ -52,15 +66,28 @@ namespace Lana.Modules
         [Command, RequireVoiceChannel, RequireSameVoiceChannel, Priority(1)]
         public async Task Play(CommandContext ctx, Uri url)
         {
-            var trackResult = await this.node.Rest.GetTracksAsync(url);
+            var loadResult = await this.node.Rest.GetTracksAsync(url);
 
-            if (!trackResult.Tracks.Any())
+            await ctx.RespondAsync($"status: {loadResult.LoadResultType}");
+
+            if (!loadResult.Tracks.Any())
             {
                 await ctx.RespondAsync($"{ctx.User.Mention} :x:");
                 return;
             }
 
-            var result = trackResult.Tracks.FirstOrDefault();
+            var result = loadResult.Tracks.FirstOrDefault();
+
+            if (string.IsNullOrEmpty(result?.TrackString))
+            {
+                await ctx.RespondAsync($"Esta nula tentando outra.");
+
+                result = loadResult.Tracks.FirstOrDefault(x => x != null);
+
+                if (string.IsNullOrEmpty(result?.TrackString))
+                    await ctx.RespondAsync($"Esta nula tambem.");
+            }
+
             await this.connection.PlayAsync(result);
         }
     }
