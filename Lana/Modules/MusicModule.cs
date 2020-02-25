@@ -18,15 +18,20 @@ namespace Lana.Modules
         private ConcurrentQueue<TrackInfo> tracks;
         private TrackInfo currentTrack;
         private LavalinkConfiguration config;
+        private LanaBot bot;
 
-        public MusicModule()
+        public MusicModule(LanaBot bot)
         {
-
+            this.bot = bot;
+            this.config = new LavalinkConfiguration(this.bot.Configuration.Lavalink.Build());
         }
 
         public override async Task BeforeExecutionAsync(CommandContext ctx)
         {
             var lavalink = ctx.Client.GetLavalink();
+
+            if (this.node == null || !this.node.IsConnected)
+                this.node = lavalink.GetNodeConnection(this.bot.Configuration.Lavalink.RestEndpoint);
 
             if (this.node == null || !this.node.IsConnected)
                 this.node = await lavalink.ConnectAsync(this.config);
@@ -47,7 +52,16 @@ namespace Lana.Modules
         [Command, RequireVoiceChannel, RequireSameVoiceChannel, Priority(1)]
         public async Task Play(CommandContext ctx, Uri url)
         {
+            var trackResult = await this.node.Rest.GetTracksAsync(url);
 
+            if (!trackResult.Tracks.Any())
+            {
+                await ctx.RespondAsync($"{ctx.User.Mention} :x:");
+                return;
+            }
+
+            var result = trackResult.Tracks.FirstOrDefault();
+            await this.connection.PlayAsync(result);
         }
     }
 }

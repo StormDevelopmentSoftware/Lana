@@ -52,6 +52,13 @@ namespace Lana
             });
 
             this.CommandsNext.RegisterCommands(typeof(LanaBot).Assembly);
+            this.CommandsNext.CommandErrored += ProcessCommandFailed;
+        }
+
+        Task ProcessCommandFailed(CommandErrorEventArgs e)
+        {
+            Console.WriteLine(e.Exception +"\n");
+            return Task.CompletedTask;
         }
 
         public Task InitializeAsync()
