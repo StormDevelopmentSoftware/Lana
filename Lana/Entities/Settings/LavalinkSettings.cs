@@ -31,7 +31,7 @@ namespace Lana.Entities.Settings
         public string ResumeKey { get; private set; } = "lanabot-lavalink";
 
         [JsonProperty]
-        public int ResumeTimeout { get; private set; } = 60;
+        public TimeSpan ResumeTimeout { get; private set; } = TimeSpan.FromMinutes(3d);
 
         public LavalinkConfiguration Build()
         {
@@ -41,7 +41,7 @@ namespace Lana.Entities.Settings
                 RestEndpoint = this.RestEndpoint,
                 SocketEndpoint = this.SocketEndpoint,
                 ResumeKey = this.ResumeKey,
-                ResumeTimeout = this.ResumeTimeout
+                ResumeTimeout = (int) this.ResumeTimeout.TotalSeconds
             };
         }
     }
