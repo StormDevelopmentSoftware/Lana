@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using DSharpPlus;
 using DSharpPlus.CommandsNext;
 using DSharpPlus.CommandsNext.Attributes;
+using DSharpPlus.Entities;
 using DSharpPlus.Lavalink;
 using DSharpPlus.Lavalink.EventArgs;
 using DSharpPlus.Net;
@@ -23,7 +24,7 @@ namespace Lana.Modules
         private LavalinkNodeConnection node;
         private LavalinkGuildConnection connection;
         private ConcurrentQueue<TrackInfo> tracks;
-        private TrackInfo state;
+        private TrackInfo currentTrack;
         private LavalinkConfiguration config;
         private LanaBot bot;
 
@@ -31,7 +32,7 @@ namespace Lana.Modules
         {
             this.bot = bot;
             this.tracks = new ConcurrentQueue<TrackInfo>();
-            this.state = default;
+            this.currentTrack = default;
             this.bot.Lavalink.NodeDisconnected += this.NotifyNodeDisconnected;
             this.UpdateConfiguration();
         }
@@ -46,7 +47,10 @@ namespace Lana.Modules
 
             if (response.Tracks?.Count() == 0)
             {
-                await ctx.RespondAsync($"{ctx.User.Mention} :x: Nenhum resultado encontrado para `{Formatter.Sanitize(search)}`");
+                await ctx.RespondAsync(ctx.User.Mention, embed: new DiscordEmbedBuilder()
+                    .WithColor(DiscordColor.Red)
+                    .WithDescription($"{ctx.User.Mention} :x: Nenhum resultado encontrado para pesquisa!"));
+
                 return;
             }
 
@@ -55,24 +59,42 @@ namespace Lana.Modules
 
             if (result.TimedOut)
             {
-                await ctx.RespondAsync($"{ctx.User.Mention} :x: Tempo limite esgotado.");
+                await ctx.RespondAsync(ctx.User.Mention, embed: new DiscordEmbedBuilder()
+                    .WithColor(DiscordColor.Red)
+                    .WithDescription($"{ctx.User.Mention} :x: Tempo limite esgotado!"));
+
                 return;
             }
 
             var pos = this.tracks.Count + 1;
-            var data = result.Info.Track;
-            var op = await this.PlayTrackAsync(result.Info);
+            var selectedTrack = result.Info.Track;
+            this.tracks.Enqueue(result.Info);
 
-            string message;
+            await ctx.RespondAsync(ctx.User.Mention, embed: new DiscordEmbedBuilder()
+                    .WithColor(DiscordColor.Blurple)
+                    .WithDescription($":headphones: A música **{Formatter.Sanitize(selectedTrack.Title)}** ({Formatter.Sanitize(selectedTrack.Length.Format())}) foi adicionada à fila! `[#{pos}]`"));
 
-            if (op == 0)
-                message = $"{ctx.User.Mention} :notes: Tocando agora **{Formatter.Sanitize(data.Title)}** `[{Formatter.Sanitize(data.Length.Format())}]`";
-            else if (op == 1)
-                message = $"{ctx.User.Mention} :headphones: Enfileirado [`#{pos}`] **{Formatter.Sanitize(data.Title)}** `[{Formatter.Sanitize(data.Length.Format())}]`";
-            else
-                message = $"{ctx.User.Mention} :x: Lavalink não disponível!";
+            if(this.currentTrack == null)
+                await this.NotifyNextTrackAsync();
 
-            await ctx.RespondAsync(message);
+            //if (op == 0)
+            //{
+            //    await ctx.RespondAsync(ctx.User.Mention, embed: new DiscordEmbedBuilder()
+            //        .WithColor(DiscordColor.Blurple)
+            //        .WithDescription($":notes: Tocando agora **{Formatter.Sanitize(selectedTrack.Title)}** ({Formatter.Sanitize(selectedTrack.Length.Format())})"));
+            //}
+            //else if (op == 1)
+            //{
+            //    await ctx.RespondAsync(ctx.User.Mention, embed: new DiscordEmbedBuilder()
+            //        .WithColor(DiscordColor.Blurple)
+            //        .WithDescription($":headphones: A música **{Formatter.Sanitize(selectedTrack.Title)}** ({Formatter.Sanitize(selectedTrack.Length.Format())}) foi adicionada à fila! `[#{pos}]`"));
+            //}
+            //else
+            //{
+            //    await ctx.RespondAsync(ctx.User.Mention, embed: new DiscordEmbedBuilder()
+            //        .WithColor(DiscordColor.Red)
+            //        .WithDescription($"{ctx.User.Mention} :x: Lavalink não disponível!"));
+            //}
         }
 
         [Command, RequireVoiceChannel, RequireSameVoiceChannel, Priority(1)]
@@ -81,28 +103,54 @@ namespace Lana.Modules
 
         }
 
-        protected async  Task NotifyNextTrack()
+        protected async Task NotifyTrackFinished(TrackFinishEventArgs e)
         {
-
+            await Task.Delay(1000);
+            await this.NotifyNextTrackAsync();
         }
 
-        protected async Task<int> PlayTrackAsync(TrackInfo track)
+        protected async  Task NotifyNextTrackAsync()
         {
-            if (this.connection == null)
-                return -1;
-
-            if (this.state != null)
+            if (this.tracks.TryDequeue(out this.currentTrack))
             {
-                this.tracks.Enqueue(track);
-                return 1;
+                await this.connection.PlayAsync(this.currentTrack.Track);
+
+                try
+                {
+                    var selectedTrack = this.currentTrack.Track;
+
+                    await this.currentTrack.Channel.SendMessageAsync(embed: new DiscordEmbedBuilder()
+                        .WithColor(DiscordColor.Blurple)
+                        .WithDescription($":notes: Tocando agora **{Formatter.Sanitize(selectedTrack.Title)}** ({Formatter.Sanitize(selectedTrack.Length.Format())})"));
+
+                    await Task.Delay(250);
+
+                }
+                catch { }
             }
             else
             {
-                this.state = track;
-                await this.connection.PlayAsync(this.state.Track);
-                return 0;
+                await this.connection.DisconnectAsync();
             }
         }
+
+        //protected async Task<int> PlayTrackAsync(TrackInfo track)
+        //{
+        //    if (this.connection == null)
+        //        return -1;
+
+        //    if (this.currentTrack != null)
+        //    {
+        //        this.tracks.Enqueue(track);
+        //        return 1;
+        //    }
+        //    else
+        //    {
+        //        this.currentTrack = track;
+        //        await this.NotifyNextTrackAsync();
+        //        return 0;
+        //    }
+        //}
 
         protected Task NotifyNodeDisconnected(NodeDisconnectedEventArgs e)
         {
@@ -138,6 +186,8 @@ namespace Lana.Modules
             var botVoiceChannel = ctx.Guild.CurrentMember.VoiceState?.Channel;
             var memberVoiceChannel = ctx.Member.VoiceState?.Channel;
 
+            /*
+
             if (botVoiceChannel == null && memberVoiceChannel != null)
             {
                 this.connection = await this.node.ConnectAsync(memberVoiceChannel);
@@ -156,6 +206,29 @@ namespace Lana.Modules
                     .TryRemove(ctx.Guild.Id, out var _);
 
                 this.connection = await this.node.ConnectAsync(memberVoiceChannel);
+            }*/
+
+            if (this.connection == null || !this.connection.IsConnected)
+            {
+                this.connection = this.node.GetConnection(ctx.Guild);
+                
+                if(this.connection != null)
+                    this.connection.PlaybackFinished += this.NotifyTrackFinished;
+            }
+
+            if (this.connection == null || !this.connection.IsConnected)
+            {
+                if (botVoiceChannel == null || (botVoiceChannel != null && memberVoiceChannel == botVoiceChannel))
+                {
+                    var objRef = this.node.GetType().GetProperty("ConnectedGuilds",
+                        BindingFlags.NonPublic | BindingFlags.Instance).GetValue(this.node);
+
+                    ((ConcurrentDictionary<ulong, LavalinkGuildConnection>)objRef)
+                        .TryRemove(ctx.Guild.Id, out var _);
+
+                    this.connection = await this.node.ConnectAsync(memberVoiceChannel);
+                    this.connection.PlaybackFinished += this.NotifyTrackFinished;
+                }
             }
         }
     }

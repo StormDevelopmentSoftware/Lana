@@ -61,7 +61,7 @@ namespace Lana.Entities.Lavalink
                     return result;
                 }
 
-                var description = $"Resultados da pesquisa de _\"{Formatter.Sanitize(this.search)}\"_\n\u200b\n";
+                string description = string.Empty;
 
                 for (var i = 0; i < this.count; i++)
                 {
@@ -76,6 +76,7 @@ namespace Lana.Entities.Lavalink
                 }
 
                 var builder = new DiscordEmbedBuilder()
+                    .WithTitle($":mag: Resultados da pesquisa para __**{Formatter.Sanitize(this.search)}**__")
                     .WithDescription(description)
                     .WithFooter($"Solicitado por {this.context.User.Format()}", this.context.User.AvatarUrl)
                     .WithTimestamp(DateTime.Now)
@@ -90,13 +91,15 @@ namespace Lana.Entities.Lavalink
                     x.Message == msg && x.User == this.context.User
                         && NumberMappingReversed.ContainsKey(x.Emoji));
 
+                try { await msg.DeleteAsync(); }
+                catch { }
+
                 if (response.TimedOut)
                     return result;
                 else
                 {
                     var option = NumberMappingReversed[response.Result.Emoji];
                     var track = this.tracks.ElementAt(option - 1);
-
                     result.TimedOut = false;
                     result.Info = new TrackInfo(this.context.Channel, this.context.User, track);
                     return result;
