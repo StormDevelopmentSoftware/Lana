@@ -45,7 +45,7 @@ namespace Lana
 
             if (guild == null)
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.ForegroundColor = ConsoleColor.Magenta;
                 Console.Write("[LANA]");
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.Write(" Não foi possível determinar a guilda de moderação.\n");
@@ -54,6 +54,12 @@ namespace Lana
             }
 
             this.logChannel = guild.GetChannel(LogChannelId);
+
+            Console.ForegroundColor = ConsoleColor.Magenta;
+            Console.Write("[LANA]");
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.Write($" Guild de moderação reconhecida: {guild.Name}: #{this.logChannel.Name}");
+            Console.ResetColor();
 
             return Task.CompletedTask;
         }
@@ -96,14 +102,14 @@ namespace Lana
             while (ex is AggregateException)
                 ex = ex.InnerException;
 
-            if(ex is ChecksFailedException checks)
+            if (ex is ChecksFailedException checks)
             {
-                if(checks.HasFailedCheck<RequireVoiceChannelAttribute>())
+                if (checks.HasFailedCheck<RequireVoiceChannelAttribute>())
                 {
                     await ctx.RespondAsync($"{ctx.User.Mention} :x: Você precisa estar conectado em um canal de voz.");
                     return;
                 }
-                else if(checks.HasFailedCheck<RequireSameVoiceChannelAttribute>())
+                else if (checks.HasFailedCheck<RequireSameVoiceChannelAttribute>())
                 {
                     await ctx.RespondAsync($"{ctx.User.Mention} :x: Você precisa estar conectado no mesmo canal de voz que eu.");
                     return;
@@ -135,7 +141,7 @@ namespace Lana
                     ["Classe"] = ex.GetType().FullName
                 };
 
-                foreach(var (key, value) in props)
+                foreach (var (key, value) in props)
                 {
                     Console.ForegroundColor = ConsoleColor.Cyan;
                     Console.Write(key.PadRight(12));
