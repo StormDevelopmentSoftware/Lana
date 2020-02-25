@@ -50,6 +50,8 @@ namespace Lana
                 EnableDms = false,
                 Services = this.Services
             });
+
+            this.CommandsNext.RegisterCommands(typeof(LanaBot).Assembly);
         }
 
         public Task InitializeAsync()
