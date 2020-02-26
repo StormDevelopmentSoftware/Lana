@@ -93,8 +93,7 @@ namespace Lana.Entities.Lavalink
 					x.Message == msg && x.User == this.context.User
 						&& (NumberMappingReversed.ContainsKey(x.Emoji) || x.Emoji == X));
 
-				try { await msg.DeleteAsync(); }
-				catch { }
+				await msg.DeleteAsync().Safe();
 
 				if (response.TimedOut)
 					return result;

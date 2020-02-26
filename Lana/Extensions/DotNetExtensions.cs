@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 
 public static class DotNetExtensions
 {
@@ -22,4 +23,21 @@ public static class DotNetExtensions
 
 		return result.TrimEnd();
 	}
+
+	public static async Task Safe(this Task t)
+	{
+		try { await t; }
+		catch { }
+	}
+
+	public static async Task<TResult> Safe<TResult>(this Task<TResult> t)
+	{
+		var def = default(TResult);
+
+		try { def = await t; }
+		catch { }
+
+		return def;
+	}
+
 }
