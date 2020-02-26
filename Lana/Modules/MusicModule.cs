@@ -5,11 +5,13 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Threading.Tasks;
 using DSharpPlus;
 using DSharpPlus.CommandsNext;
 using DSharpPlus.CommandsNext.Attributes;
 using DSharpPlus.Entities;
+using DSharpPlus.Interactivity;
 using DSharpPlus.Lavalink;
 using DSharpPlus.Lavalink.EventArgs;
 using DSharpPlus.Net;
@@ -43,7 +45,6 @@ namespace Lana.Modules
         [Command, Aliases("np"), Priority(0)]
         public async Task NowPlaying(CommandContext ctx)
         {
-            Console.WriteLine(currentTrack.Track.Uri.ToString());
             if (currentTrack != null)
             {
                 var imageURL = $"https://img.youtube.com/vi/{currentTrack.Track.Uri.ToString().Replace("https://www.youtube.com/watch?v=", "")}/maxresdefault.jpg";
@@ -59,6 +60,35 @@ namespace Lana.Modules
 
             }
             else await ctx.RespondAsync(":x: Nenhuma música está sendo tocada neste momento!");
+        }
+
+        [Command, Aliases("q", "fila")]
+        public async Task Queue(CommandContext ctx)
+        {
+            if (currentTrack == null)
+            {
+                await ctx.RespondAsync(":x: Nenhuma música está sendo tocada neste momento!");
+                return;
+            }
+
+            var interactivity = ctx.Client.GetInteractivity();
+            
+            var sb = new StringBuilder();
+
+            sb.Append($"[**`▶️ AGORA`**] {Formatter.Bold(Formatter.Sanitize(currentTrack.Track.Title))} pedido por {currentTrack.User.Mention} (`{currentTrack.Track.Length.Format()}`)\n");
+
+            int index = 1;
+            foreach (var track in tracks)
+            {
+                sb.Append($"[**`#{index}`**] {Formatter.Bold(Formatter.Sanitize(track.Track.Title))} pedido por {track.User.Mention} (`{track.Track.Length.Format()}`)\n");
+                index++;
+            }
+            var embed = new DiscordEmbedBuilder()
+                .WithColor(DiscordColor.Blurple)
+                .WithAuthor("Fila de Músicas", iconUrl: ctx.Client.CurrentUser.AvatarUrl);
+
+            var pages = interactivity.GeneratePagesInEmbed(sb.ToString(), SplitType.Line, embed);
+            await interactivity.SendPaginatedMessageAsync(ctx.Channel, ctx.User, pages);
         }
 
         [Command, RequireVoiceChannel, RequireSameVoiceChannel, Priority(0)]
