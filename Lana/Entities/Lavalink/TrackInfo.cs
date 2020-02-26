@@ -29,8 +29,11 @@ namespace Lana.Entities.Lavalink
 
 		public bool Equals(TrackInfo other)
 		{
-			if (ReferenceEquals(other, null)) return false;
-			if (ReferenceEquals(other, this)) return true;
+			if (ReferenceEquals(other, null))
+				return false;
+
+			if (ReferenceEquals(other, this))
+				return true;
 
 			return this.Channel == other.Channel
 				&& this.User == other.User

@@ -22,9 +22,9 @@ namespace Lana
 			this.discord = this.bot.Discord;
 		}
 
-		private const ulong LogGuildId = 681496938092429357;
-		private const ulong LogChannelId = 681940088045043717;
-		private DiscordChannel logChannel;
+		public const ulong LogGuildId = 681496938092429357;
+		public const ulong LogChannelId = 681940088045043717;
+		protected DiscordChannel CurrentLogChannel { get; private set; }
 
 		public Task InitializeAsync()
 		{
@@ -46,17 +46,17 @@ namespace Lana
 				Console.ForegroundColor = ConsoleColor.Magenta;
 				Console.Write("[LANA]");
 				Console.ForegroundColor = ConsoleColor.Red;
-				Console.WriteLine(" Não foi possível determinar a guilda de moderação.\n");
+				Console.WriteLine(" Não foi possível determinar a guilda de moderação.");
 				Console.ResetColor();
 				return Task.CompletedTask;
 			}
 
-			this.logChannel = guild.GetChannel(LogChannelId);
+			this.CurrentLogChannel = guild.GetChannel(LogChannelId);
 
 			Console.ForegroundColor = ConsoleColor.Magenta;
 			Console.Write("[LANA]");
 			Console.ForegroundColor = ConsoleColor.Red;
-			Console.WriteLine($" Guild de moderação reconhecida: {guild.Name}: #{this.logChannel.Name}");
+			Console.WriteLine($" Guild de moderação reconhecida: {guild.Name}: #{this.CurrentLogChannel.Name}");
 			Console.ResetColor();
 
 			return Task.CompletedTask;
@@ -67,10 +67,10 @@ namespace Lana
 			if (e.Author.IsBot)
 				return Task.CompletedTask;
 
-			if (this.logChannel == null)
+			if (this.CurrentLogChannel == null)
 				return Task.CompletedTask;
 
-			_ = Task.Run(() => this.logChannel.SendMessageAsync(embed: new DiscordEmbedBuilder()
+			_ = Task.Run(() => this.CurrentLogChannel.SendMessageAsync(embed: new DiscordEmbedBuilder()
 				.WithTitle("Mensagem editada")
 				.WithColor(DiscordColor.Yellow)
 				.WithDescription($"{e.Author.Username}#{e.Author.Discriminator} (ID {e.Author.Id}) mudou a sua mensagem no canal {e.Channel.Mention} de: {Formatter.BlockCode(Formatter.Sanitize(e.MessageBefore.Content))} para: {Formatter.BlockCode(Formatter.Sanitize(e.Message.Content))}")
@@ -85,10 +85,10 @@ namespace Lana
 			if (e.Message.Author?.IsBot == true)
 				return Task.CompletedTask;
 
-			if (this.logChannel == null)
+			if (this.CurrentLogChannel == null)
 				return Task.CompletedTask;
 
-			_ = Task.Run(() => this.logChannel.SendMessageAsync(embed: new DiscordEmbedBuilder()
+			_ = Task.Run(() => this.CurrentLogChannel.SendMessageAsync(embed: new DiscordEmbedBuilder()
 				.WithTitle("Mensagem deletada")
 				.WithColor(DiscordColor.Red)
 				.WithDescription($"A mensagem de {e.Message.Author.Username}#{e.Message.Author.Discriminator} (ID {e.Message.Author.Id}) em {e.Channel.Mention} foi apagada: {Formatter.BlockCode(Formatter.Sanitize(e.Message.Content))}")
@@ -158,10 +158,10 @@ namespace Lana
 					Console.Write(" " + value);
 
 					Console.ForegroundColor = ConsoleColor.White;
-					Console.Write("\n");
+					Console.WriteLine();
 				}
 
-				Console.Write("\n");
+				Console.WriteLine();
 
 				await ctx.RespondAsync($"[`{ex.GetType().Name}`] {ctx.User.Mention} :x: Um erro ocorreu durante a execução do comando.");
 			}

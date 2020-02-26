@@ -51,12 +51,12 @@ namespace Lana.Entities.Lavalink
 
 		public async Task<TrackSelectorResult> SelectAsync()
 		{
-			var result = new TrackSelectorResult { TimedOut = true };
+			var result = new TrackSelectorResult { Status = TrackSelectorStatus.TimedOut };
 			{
 				if (this.count == 1)
 				{
-					result.Info = new TrackInfo(this.context.Channel, this.context.User, this.tracks.First());
-					result.TimedOut = false;
+					result.CurrentTrack = new TrackInfo(this.context.Channel, this.context.User, this.tracks.First());
+					result.Status = TrackSelectorStatus.Success;
 					return result;
 				}
 
@@ -86,11 +86,12 @@ namespace Lana.Entities.Lavalink
 				for (var i = 0; i < this.count; i++)
 					await msg.CreateReactionAsync(NumberMapping[i + 1]);
 
-				await msg.CreateReactionAsync(DiscordEmoji.FromUnicode("❌"));
+				var X = DiscordEmoji.FromUnicode("❌");
+				await msg.CreateReactionAsync(X);
 
 				var response = await this.interactivity.WaitForReactionAsync(x =>
 					x.Message == msg && x.User == this.context.User
-						&& (NumberMappingReversed.ContainsKey(x.Emoji) || x.Emoji == DiscordEmoji.FromUnicode("❌")));
+						&& (NumberMappingReversed.ContainsKey(x.Emoji) || x.Emoji == X));
 
 				try { await msg.DeleteAsync(); }
 				catch { }
@@ -99,15 +100,15 @@ namespace Lana.Entities.Lavalink
 					return result;
 				else
 				{
-					if (response.Result.Emoji == DiscordEmoji.FromUnicode("❌"))
+					if (response.Result.Emoji == X)
 					{
-						result.Cancelled = true;
+						result.Status = TrackSelectorStatus.Cancelled;
 						return result;
 					}
 					var option = NumberMappingReversed[response.Result.Emoji];
 					var track = this.tracks.ElementAt(option - 1);
-					result.TimedOut = false;
-					result.Info = new TrackInfo(this.context.Channel, this.context.User, track);
+					result.Status = TrackSelectorStatus.Success;
+					result.CurrentTrack = new TrackInfo(this.context.Channel, this.context.User, track);
 					return result;
 				}
 			}

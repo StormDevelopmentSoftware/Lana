@@ -39,10 +39,9 @@ namespace Lana.Modules
 		public void UpdateConfiguration()
 			=> this.config = new LavalinkConfiguration(this.bot.Configuration.Lavalink.Build());
 
-		[Command, Aliases("np"), Priority(0)]
+		[Command, Aliases("np")]
 		public async Task NowPlaying(CommandContext ctx)
 		{
-			Console.WriteLine(currentTrack.Track.Uri.ToString());
 			if (currentTrack != null)
 			{
 				var imageURL = $"https://img.youtube.com/vi/{currentTrack.Track.Uri.ToString().Replace("https://www.youtube.com/watch?v=", "")}/maxresdefault.jpg";
@@ -73,20 +72,19 @@ namespace Lana.Modules
 
 			var selector = new TrackSelector(ctx, response.Tracks, search);
 			var result = await selector.SelectAsync();
-			if (result.Cancelled)
+			if (result.Status == TrackSelectorStatus.Cancelled)
 			{
 				return;
 			}
-			if (result.TimedOut)
+			else if (result.Status == TrackSelectorStatus.TimedOut)
 			{
 				await ctx.RespondAsync($"{ctx.User.Mention} :x: Tempo limite esgotado!");
-
 				return;
 			}
 
 			var pos = this.tracks.Count + 1;
-			var selectedTrack = result.Info.Track;
-			this.tracks.Enqueue(result.Info);
+			var selectedTrack = result.CurrentTrack.Track;
+			this.tracks.Enqueue(result.CurrentTrack);
 
 			await ctx.RespondAsync($":headphones: A música **{Formatter.Sanitize(selectedTrack.Title)}** ({Formatter.Sanitize(selectedTrack.Length.Format())}) pedida por {ctx.User.Mention} foi adicionada à fila! `[#{pos}]`");
 
