@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Lana.Entities.Settings;
 using Newtonsoft.Json;
@@ -10,64 +7,64 @@ using Newtonsoft.Json.Serialization;
 
 namespace Lana.Entities
 {
-    public class LanaConfiguration
-    {
-        [JsonProperty]
-        public DiscordSettings Discord { get; private set; } = new DiscordSettings();
+	public class LanaConfiguration
+	{
+		[JsonProperty]
+		public DiscordSettings Discord { get; private set; } = new DiscordSettings();
 
-        [JsonProperty]
-        public LavalinkSettings Lavalink { get; private set; } = new LavalinkSettings();
+		[JsonProperty]
+		public LavalinkSettings Lavalink { get; private set; } = new LavalinkSettings();
 
-        public async Task ReloadAsync()
-        {
-            var result = await LoadAsync();
-            this.Discord = result.Discord;
-            this.Lavalink = result.Lavalink;
-        }
+		public async Task ReloadAsync()
+		{
+			var result = await LoadAsync();
+			this.Discord = result.Discord;
+			this.Lavalink = result.Lavalink;
+		}
 
-        public static Task<LanaConfiguration> LoadAsync()
-        {
-            var settings = new JsonSerializerSettings
-            {
-                ContractResolver = new DefaultContractResolver
-                {
-                    NamingStrategy = new SnakeCaseNamingStrategy()
-                }
-            };
+		public static Task<LanaConfiguration> LoadAsync()
+		{
+			var settings = new JsonSerializerSettings
+			{
+				ContractResolver = new DefaultContractResolver
+				{
+					NamingStrategy = new SnakeCaseNamingStrategy()
+				}
+			};
 
-            var result = new LanaConfiguration();
+			var result = new LanaConfiguration();
 
-            var file = new FileInfo(Path.Combine(Directory.GetCurrentDirectory(), "Config.json"));
+			var file = new FileInfo(Path.Combine(Directory.GetCurrentDirectory(), "Config.json"));
 
-            if (!file.Exists)
-            {
-                using (var sw = file.CreateText())
-                {
-                    sw.WriteLine(JsonConvert.SerializeObject(result, Formatting.Indented, settings));
-                    sw.Flush();
-                }
-            }
-            else
-            {
-                using(var sr = file.OpenText())
-                {
-                    try
-                    {
-                        var json = sr.ReadToEnd();
-                        result = JsonConvert.DeserializeObject<LanaConfiguration>(json, settings);
-                    }
-                    catch(Exception ex)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.Write("[LANA] Inicialização da configuração falhou! ");
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.Write(ex);
-                        Console.ResetColor();
-                    }
-                }
-            }
+			if (!file.Exists)
+			{
+				using (var sw = file.CreateText())
+				{
+					sw.WriteLine(JsonConvert.SerializeObject(result, Formatting.Indented, settings));
+					sw.Flush();
+				}
+			}
+			else
+			{
+				using (var sr = file.OpenText())
+				{
+					try
+					{
+						var json = sr.ReadToEnd();
+						result = JsonConvert.DeserializeObject<LanaConfiguration>(json, settings);
+					}
+					catch (Exception ex)
+					{
+						Console.ForegroundColor = ConsoleColor.Yellow;
+						Console.Write("[LANA] Inicialização da configuração falhou! ");
+						Console.ForegroundColor = ConsoleColor.Red;
+						Console.Write(ex);
+						Console.ResetColor();
+					}
+				}
+			}
 
-            return Task.FromResult(result);
-        }
-    }
+			return Task.FromResult(result);
+		}
+	}
 }
