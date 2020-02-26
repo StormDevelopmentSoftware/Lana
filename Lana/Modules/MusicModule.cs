@@ -61,17 +61,24 @@ namespace Lana.Modules
 		[Command, RequireVoiceChannel, RequireSameVoiceChannel, Priority(0)]
 		public async Task Play(CommandContext ctx, [RemainingText] string search)
 		{
+			var lpWait = await ctx.RespondAsync(embed: new DiscordEmbedBuilder()
+				.WithAuthor("Obtendo pesquisa de músicas...", iconUrl: "https://i.imgur.com/HACGw6c.gif"));
+
+			await ctx.TriggerTypingAsync();
+
 			var response = await this.node.Rest.GetTracksAsync(search, LavalinkSearchType.Youtube);
 
 			if (response.Tracks?.Count() == 0)
 			{
+				await lpWait.DeleteAsync().Safe();
 				await ctx.RespondAsync($"{ctx.User.Mention} :x: Nenhum resultado encontrado para pesquisa!");
-
 				return;
 			}
 
 			var selector = new TrackSelector(ctx, response.Tracks, search);
 			var result = await selector.SelectAsync();
+			await lpWait.DeleteAsync().Safe();
+
 			if (result.Status == TrackSelectorStatus.Cancelled)
 			{
 				return;
@@ -114,7 +121,55 @@ namespace Lana.Modules
 		[Command, RequireVoiceChannel, RequireSameVoiceChannel, Priority(1)]
 		public async Task Play(CommandContext ctx, Uri url)
 		{
+			var lpWait = await ctx.RespondAsync(embed: new DiscordEmbedBuilder()
+				.WithAuthor("Obtendo pesquisa de músicas...", iconUrl: "https://i.imgur.com/HACGw6c.gif"));
 
+			await ctx.TriggerTypingAsync();
+
+			var response = await this.node.Rest.GetTracksAsync(url);
+
+			if(response.Tracks?.Count() == 0)
+			{
+				await lpWait.DeleteAsync().Safe();
+				await ctx.RespondAsync(ctx.User.Mention, embed: new DiscordEmbedBuilder()
+					.WithColor(DiscordColor.Red)
+					.WithDescription($"[`{response.LoadResultType}`] URL fornecida é inválida!"));
+
+				return;
+			}
+
+			await lpWait.DeleteAsync().Safe();
+
+			if(response.LoadResultType == LavalinkLoadResultType.TrackLoaded)
+			{
+				var selectedTrack = response.Tracks.First();
+				var pos = this.tracks.Count;
+				this.tracks.Enqueue(new TrackInfo(ctx.Channel, ctx.User, selectedTrack));
+				await ctx.RespondAsync($":headphones: A música **{Formatter.Sanitize(selectedTrack.Title)}** ({Formatter.Sanitize(selectedTrack.Length.Format())}) pedida por {ctx.User.Mention} foi adicionada à fila! `[#{pos}]`");
+			}
+			else if(response.LoadResultType == LavalinkLoadResultType.PlaylistLoaded)
+			{
+				var count = 0;
+
+				foreach(var selectedTrack in response.Tracks)
+				{
+					count++;
+					this.tracks.Enqueue(new TrackInfo(ctx.Channel, ctx.User, selectedTrack));
+				}
+
+				await ctx.RespondAsync($":headphones: Foram adicionada(s) {count:#,#} músicas na fila."); // TODO pagination pra ver as musicas
+			}
+			else
+			{
+				await ctx.RespondAsync(ctx.User.Mention, embed: new DiscordEmbedBuilder()
+					.WithColor(DiscordColor.Red)
+					.WithDescription($"[`{response.LoadResultType}`] URL fornecida é inválida!"));
+
+				return;
+			}
+
+			if (this.currentTrack == null)
+				await this.NotifyNextTrackAsync();
 		}
 
 		protected async Task NotifyTrackFinished(TrackFinishEventArgs e)
