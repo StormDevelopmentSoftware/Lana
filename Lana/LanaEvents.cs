@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices.ComTypes;
 using System.Threading.Tasks;
 using DSharpPlus;
 using DSharpPlus.CommandsNext;
@@ -48,7 +49,7 @@ namespace Lana
                 Console.ForegroundColor = ConsoleColor.Magenta;
                 Console.Write("[LANA]");
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.Write(" Não foi possível determinar a guilda de moderação.\n");
+                Console.WriteLine(" Não foi possível determinar a guilda de moderação.\n");
                 Console.ResetColor();
                 return Task.CompletedTask;
             }
@@ -58,7 +59,7 @@ namespace Lana
             Console.ForegroundColor = ConsoleColor.Magenta;
             Console.Write("[LANA]");
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.Write($" Guild de moderação reconhecida: {guild.Name}: #{this.logChannel.Name}");
+            Console.WriteLine($" Guild de moderação reconhecida: {guild.Name}: #{this.logChannel.Name}");
             Console.ResetColor();
 
             return Task.CompletedTask;
@@ -75,7 +76,7 @@ namespace Lana
             _ = Task.Run(() => this.logChannel.SendMessageAsync(embed: new DiscordEmbedBuilder()
                 .WithTitle("Mensagem editada")
                 .WithColor(DiscordColor.Yellow)
-                .WithDescription($"{e.Author.Username}#{e.Author.Discriminator} (ID {e.Author.Id}) mudou a sua mensagem, de {Formatter.BlockCode(Formatter.Sanitize(e.MessageBefore.Content))} para {Formatter.BlockCode(Formatter.Sanitize(e.Message.Content))}")
+                .WithDescription($"{e.Author.Username}#{e.Author.Discriminator} (ID {e.Author.Id}) mudou a sua mensagem no canal {e.Channel.Mention} de: {Formatter.BlockCode(Formatter.Sanitize(e.MessageBefore.Content))} para: {Formatter.BlockCode(Formatter.Sanitize(e.Message.Content))}")
                 .WithTimestamp(DateTime.Now)
                 .WithFooter($"{e.Author.Username}#{e.Author.Discriminator}", e.Author.AvatarUrl)));
 
@@ -93,7 +94,7 @@ namespace Lana
             _ = Task.Run(() => this.logChannel.SendMessageAsync(embed: new DiscordEmbedBuilder()
                 .WithTitle("Mensagem deletada")
                 .WithColor(DiscordColor.Red)
-                .WithDescription($"{e.Message.Author.Username}#{e.Message.Author.Discriminator} (ID {e.Message.Author.Id}) apagou a sua mensagem, {Formatter.BlockCode(Formatter.Sanitize(e.Message.Content))}")
+                .WithDescription($"A mensagem de {e.Message.Author.Username}#{e.Message.Author.Discriminator} (ID {e.Message.Author.Id}) em {e.Channel.Mention} foi apagada: {Formatter.BlockCode(Formatter.Sanitize(e.Message.Content))}")
                 .WithTimestamp(DateTime.Now)
                 .WithFooter($"{e.Message.Author.Username}#{e.Message.Author.Discriminator}", e.Message.Author.AvatarUrl)));
 

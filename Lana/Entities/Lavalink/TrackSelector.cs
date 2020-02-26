@@ -69,7 +69,7 @@ namespace Lana.Entities.Lavalink
                     var name = track.Title;
 
                     if (name.Length > 64)
-                        name = name.Substring(name.Length - (64 + 3)) + "...";
+                        name = name.Substring(0, 64) + "...";
 
                     description += string.Concat(NumberMapping[i + 1], " ",
                         Formatter.MaskedUrl(Formatter.Sanitize(name), track.Uri, track.Author), "\n");
@@ -87,9 +87,11 @@ namespace Lana.Entities.Lavalink
                 for (var i = 0; i < this.count; i++)
                     await msg.CreateReactionAsync(NumberMapping[i + 1]);
 
+                await msg.CreateReactionAsync(DiscordEmoji.FromUnicode("❌"));
+
                 var response = await this.interactivity.WaitForReactionAsync(x =>
                     x.Message == msg && x.User == this.context.User
-                        && NumberMappingReversed.ContainsKey(x.Emoji));
+                        && (NumberMappingReversed.ContainsKey(x.Emoji) || x.Emoji == DiscordEmoji.FromUnicode("❌")));
 
                 try { await msg.DeleteAsync(); }
                 catch { }
@@ -98,6 +100,11 @@ namespace Lana.Entities.Lavalink
                     return result;
                 else
                 {
+                    if (response.Result.Emoji == DiscordEmoji.FromUnicode("❌"))
+                    {
+                        result.Cancelled = true;
+                        return result;
+                    }
                     var option = NumberMappingReversed[response.Result.Emoji];
                     var track = this.tracks.ElementAt(option - 1);
                     result.TimedOut = false;

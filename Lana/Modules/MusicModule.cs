@@ -40,6 +40,27 @@ namespace Lana.Modules
         public void UpdateConfiguration()
             => this.config = new LavalinkConfiguration(this.bot.Configuration.Lavalink.Build());
 
+        [Command, Aliases("np"), Priority(0)]
+        public async Task NowPlaying(CommandContext ctx)
+        {
+            Console.WriteLine(currentTrack.Track.Uri.ToString());
+            if (currentTrack != null)
+            {
+                var imageURL = $"https://img.youtube.com/vi/{currentTrack.Track.Uri.ToString().Replace("https://www.youtube.com/watch?v=", "")}/maxresdefault.jpg";
+                await ctx.RespondAsync(embed: new DiscordEmbedBuilder()
+                    .WithTitle(":headphones: Tocando agora")
+                    .AddField("Título e autor", Formatter.Bold(Formatter.Sanitize(currentTrack.Track.Title)) + " por " + Formatter.Sanitize(currentTrack.Track.Author), true)
+                    .AddField("Posição e Duração", currentTrack.Track.Position.ToString("mm\\:ss") + " — " + currentTrack.Track.Length.ToString("mm\\:ss"), false)
+                    .AddField("Pedido por", currentTrack.User.Mention, true)
+                    .AddField("Canal", currentTrack.Channel.Mention, true)
+                    
+                    .WithColor(DiscordColor.Blurple)
+                    .WithThumbnailUrl(imageURL));
+
+            }
+            else await ctx.RespondAsync(":x: Nenhuma música está sendo tocada neste momento!");
+        }
+
         [Command, RequireVoiceChannel, RequireSameVoiceChannel, Priority(0)]
         public async Task Play(CommandContext ctx, [RemainingText] string search)
         {
@@ -47,21 +68,20 @@ namespace Lana.Modules
 
             if (response.Tracks?.Count() == 0)
             {
-                await ctx.RespondAsync(ctx.User.Mention, embed: new DiscordEmbedBuilder()
-                    .WithColor(DiscordColor.Red)
-                    .WithDescription($"{ctx.User.Mention} :x: Nenhum resultado encontrado para pesquisa!"));
+                await ctx.RespondAsync($"{ctx.User.Mention} :x: Nenhum resultado encontrado para pesquisa!");
 
                 return;
             }
 
             var selector = new TrackSelector(ctx, response.Tracks, search);
             var result = await selector.SelectAsync();
-
+            if (result.Cancelled)
+            {
+                return;
+            }
             if (result.TimedOut)
             {
-                await ctx.RespondAsync(ctx.User.Mention, embed: new DiscordEmbedBuilder()
-                    .WithColor(DiscordColor.Red)
-                    .WithDescription($"{ctx.User.Mention} :x: Tempo limite esgotado!"));
+                await ctx.RespondAsync($"{ctx.User.Mention} :x: Tempo limite esgotado!");
 
                 return;
             }
@@ -70,11 +90,9 @@ namespace Lana.Modules
             var selectedTrack = result.Info.Track;
             this.tracks.Enqueue(result.Info);
 
-            await ctx.RespondAsync(ctx.User.Mention, embed: new DiscordEmbedBuilder()
-                    .WithColor(DiscordColor.Blurple)
-                    .WithDescription($":headphones: A música **{Formatter.Sanitize(selectedTrack.Title)}** ({Formatter.Sanitize(selectedTrack.Length.Format())}) foi adicionada à fila! `[#{pos}]`"));
+            await ctx.RespondAsync($":headphones: A música **{Formatter.Sanitize(selectedTrack.Title)}** ({Formatter.Sanitize(selectedTrack.Length.Format())}) pedida por {ctx.User.Mention} foi adicionada à fila! `[#{pos}]`");
 
-            if(this.currentTrack == null)
+            if (this.currentTrack == null)
                 await this.NotifyNextTrackAsync();
 
             //if (op == 0)
@@ -109,7 +127,7 @@ namespace Lana.Modules
             await this.NotifyNextTrackAsync();
         }
 
-        protected async  Task NotifyNextTrackAsync()
+        protected async Task NotifyNextTrackAsync()
         {
             if (this.tracks.TryDequeue(out this.currentTrack))
             {
@@ -119,10 +137,7 @@ namespace Lana.Modules
                 {
                     var selectedTrack = this.currentTrack.Track;
 
-                    await this.currentTrack.Channel.SendMessageAsync(embed: new DiscordEmbedBuilder()
-                        .WithColor(DiscordColor.Blurple)
-                        .WithDescription($":notes: Tocando agora **{Formatter.Sanitize(selectedTrack.Title)}** ({Formatter.Sanitize(selectedTrack.Length.Format())})"));
-
+                    await this.currentTrack.Channel.SendMessageAsync($":notes: Tocando agora **{Formatter.Sanitize(selectedTrack.Title)}** ({Formatter.Sanitize(selectedTrack.Length.Format())})");
                     await Task.Delay(250);
 
                 }
@@ -211,8 +226,8 @@ namespace Lana.Modules
             if (this.connection == null || !this.connection.IsConnected)
             {
                 this.connection = this.node.GetConnection(ctx.Guild);
-                
-                if(this.connection != null)
+
+                if (this.connection != null)
                     this.connection.PlaybackFinished += this.NotifyTrackFinished;
             }
 
