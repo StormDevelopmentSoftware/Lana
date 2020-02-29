@@ -25,5 +25,12 @@ namespace Lana.Modules
 			await Task.Delay(5000);
 			await success.DeleteAsync();
 		}
+
+		[Command("ping")]
+		public async Task PingAsync(CommandContext ctx)
+		{
+			await ctx.TriggerTypingAsync();
+			await ctx.RespondAsync($"Ping: {ctx.Client.Ping}ms");
+		}
 	}
 }
