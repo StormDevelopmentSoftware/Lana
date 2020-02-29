@@ -39,7 +39,7 @@ namespace Lana.Modules
 			await ctx.RespondAsync(embed: new DiscordEmbedBuilder()
 				.WithAuthor("Ping", iconUrl: ctx.Client.CurrentUser.AvatarUrl)
 				.AddField(":zap: Rest", $"{watch.ElapsedMilliseconds}ms", true)
-				.AddField(":satellite_orbital: Gateway", $"{ctx.Client.Ping}ms")
+				.AddField(":satellite_orbital: Gateway", $"{ctx.Client.Ping}ms", true)
 				.WithColor(DiscordColor.Blurple)
 				.WithTimestamp(DateTime.Now));
 		}
