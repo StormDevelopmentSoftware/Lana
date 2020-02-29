@@ -1,6 +1,9 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Diagnostics;
+using System.Threading.Tasks;
 using DSharpPlus.CommandsNext;
 using DSharpPlus.CommandsNext.Attributes;
+using DSharpPlus.Entities;
 using Lana.Attributes;
 
 namespace Lana.Modules
@@ -29,8 +32,16 @@ namespace Lana.Modules
 		[Command("ping")]
 		public async Task PingAsync(CommandContext ctx)
 		{
+			var watch = Stopwatch.StartNew();
 			await ctx.TriggerTypingAsync();
-			await ctx.RespondAsync($"Ping: {ctx.Client.Ping}ms");
+			watch.Stop();
+			
+			await ctx.RespondAsync(embed: new DiscordEmbedBuilder()
+				.WithAuthor("Ping", iconUrl: ctx.Client.CurrentUser.AvatarUrl)
+				.AddField(":zap: Rest", $"{watch.ElapsedMilliseconds}ms", true)
+				.AddField(":satellite_orbital: Gateway", $"{ctx.Client.Ping}ms")
+				.WithColor(DiscordColor.Blurple)
+				.WithTimestamp(DateTime.Now));
 		}
 	}
 }
