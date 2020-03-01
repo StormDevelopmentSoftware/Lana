@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DSharpPlus;
 using DSharpPlus.Entities;
+using DSharpPlus.EventArgs;
 using DSharpPlus.Lavalink;
 using DSharpPlus.Lavalink.EventArgs;
 using Lana.Entities.Music;
@@ -55,8 +56,14 @@ namespace Lana.Services
 
 		public Task InitializeAsync()
 		{
+			this.Discord.Ready += this.NotifyReady;
 			this.NodeTimer = new Timer(NotifyTimerTick);
-			this.NodeTimer.Change(TimeSpan.Zero, TimeSpan.FromSeconds(15));
+			return Task.CompletedTask;
+		}
+
+		protected Task NotifyReady(ReadyEventArgs e)
+		{
+			this.NodeTimer.Change(TimeSpan.FromSeconds(15));
 			return Task.CompletedTask;
 		}
 
@@ -98,7 +105,7 @@ namespace Lana.Services
 					Console.Write("[LanaBot/Lavalink] ");
 					Console.ForegroundColor = ConsoleColor.Gray;
 					Console.WriteLine("Conexão com lavalink estável.");
-					this.NodeTimer.Change(TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60)); // Conexão estável, não precisa atualizar rápido de mais.
+					this.NodeTimer.Change(TimeSpan.FromMinutes(3)); // Conexão estável, não precisa atualizar rápido de mais.
 				}
 			}
 			catch(Exception ex)
@@ -107,7 +114,7 @@ namespace Lana.Services
 				Console.Write("[LanaBot/Lavalink] ");
 				Console.ForegroundColor = ConsoleColor.Yellow;
 				Console.WriteLine("Falha ao conectar-se ao nodo do lavalink!\n{0}", ex);
-				this.NodeTimer.Change(TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+				this.NodeTimer.Change(TimeSpan.FromSeconds(5));
 			}
 			finally
 			{
@@ -120,7 +127,7 @@ namespace Lana.Services
 			if(this.Node == null)
 				this.Node.Disconnected -= this.NotifyNodeDisconnected;
 
-			this.NodeTimer.Change(TimeSpan.Zero, TimeSpan.FromSeconds(15));
+			this.NodeTimer.Change(TimeSpan.FromSeconds(15));
 			return Task.CompletedTask;
 		}
 	}

@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
+using DSharpPlus;
 
 public static class DotNetExtensions
 {
@@ -42,9 +44,14 @@ public static class DotNetExtensions
 
 	public static string StrTruncate(this string text, int maxLimit = 12)
 	{
-		if (text.Length < maxLimit)
-			return text;
+		if (text.Length > maxLimit)
+			return $"{text.Substring(0, maxLimit - 3)}...";
 
-		return $"{text.Substring(0, text.Length - 3)}...";
+		return text;
+	}
+
+	public static void Change(this Timer t, TimeSpan duration)
+	{
+		t.Change(Timeout.InfiniteTimeSpan, duration);
 	}
 }
