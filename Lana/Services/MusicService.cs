@@ -63,7 +63,7 @@ namespace Lana.Services
 
 		protected Task NotifyReady(ReadyEventArgs e)
 		{
-			this.NodeTimer.Change(TimeSpan.FromSeconds(15));
+			this.NodeTimer.Change(TimeSpan.Zero, TimeSpan.FromSeconds(15));
 			return Task.CompletedTask;
 		}
 
