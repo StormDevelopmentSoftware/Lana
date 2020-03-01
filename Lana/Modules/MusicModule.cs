@@ -20,12 +20,15 @@ namespace Lana.Modules
 	[RequireGuild, ModuleLifespan(ModuleLifespan.Transient)]
 	public class MusicModule : BaseCommandModule
 	{
-		private MusicService service;
-		private MusicPlayer player;
+		[DontInject]
+		protected MusicService Service { get; set; }
+
+		[DontInject]
+		protected MusicPlayer Player { get; set; }
 
 		public MusicModule(MusicService service)
 		{
-			this.service = service;
+			this.Service = service;
 		}
 
 		async Task NowPlaying(TrackInfo ctx)
@@ -40,29 +43,36 @@ namespace Lana.Modules
 			var mbr = ctx.Member.VoiceState?.Channel;
 			var vst = ctx.Guild.CurrentMember.VoiceState?.Channel;
 
-			if (this.player == null)
-				this.player = await this.service.GetOrCreateAsync(ctx.Guild);
+			if (this.Player == null)
+				this.Player = await this.Service.GetOrCreateAsync(ctx.Guild);
 
-			if (this.player != null)
-				this.player.NowPlayingObserver = this.NowPlaying;
+			if (this.Player != null)
+				this.Player.NowPlayingObserver = this.NowPlaying;
 
-			if (!this.player.IsConnected)
+			if (!this.Player.IsConnected)
 			{
 				if (mbr == null)
 					return;
 
 				if (vst == null)
-					await this.player.InitializeAsync(mbr);
+					await this.Player.InitializeAsync(mbr);
 			}
 
-			if (this.player != null && this.player.Connection == null)
-				await this.player.InitializeAsync(mbr);
+			if (this.Player != null && this.Player.Connection == null)
+				await this.Player.InitializeAsync(mbr);
+		}
+
+		public override Task AfterExecutionAsync(CommandContext ctx)
+		{
+			this.Player = null;
+			this.Service = null;
+			return base.AfterExecutionAsync(ctx);
 		}
 
 		[Command, RequireVoiceChannel, RequireSameVoiceChannel, RequireRoles(RoleCheckMode.Any, "Administrador")]
 		public async Task Clear(CommandContext ctx)
 		{
-			await this.player.ClearQueueAsync();
+			await this.Player.ClearQueueAsync();
 			await ctx.RespondAsync(":white_check_mark: Fila limpa. A música atual irá continuar a tocar.");
 		}
 
@@ -72,7 +82,7 @@ namespace Lana.Modules
 			var waiting = await ctx.RespondAsync(embed: new DiscordEmbedBuilder()
 				.WithDescription($"{Emotes.LoadingYellow} Pesquisando músicas..."));
 
-			var lavalinkResult = await this.service.GetTracksAsync(search);
+			var lavalinkResult = await this.Service.GetTracksAsync(search);
 
 			if (lavalinkResult.Tracks?.Count() == 0)
 			{
@@ -94,11 +104,11 @@ namespace Lana.Modules
 			}
 
 			var result = selectorResult.Result;
-			var index = await player.EnqueueAsync(result);
+			var index = await Player.EnqueueAsync(result);
 			await ctx.RespondAsync($":headphones: A música **{Formatter.Sanitize(result.Track.Title)}** ({Formatter.Sanitize(result.Track.Length.Format())}) pedida por {ctx.User.Mention} foi adicionada à fila! `[#{index}]`");
 
-			if (this.player.NowPlaying == null)
-				await this.player.NextAsync();
+			if (this.Player.NowPlaying == null)
+				await this.Player.NextAsync();
 		}
 
 		[Command, RequireVoiceChannel, RequireSameVoiceChannel, Priority(1)]
@@ -107,7 +117,7 @@ namespace Lana.Modules
 			var waiting = await ctx.RespondAsync(embed: new DiscordEmbedBuilder()
 				.WithDescription($"{Emotes.LoadingYellow} Obtendo músicas..."));
 
-			var lavalinkResult = await this.service.GetTracksAsync(url);
+			var lavalinkResult = await this.Service.GetTracksAsync(url);
 			await waiting.DeleteAsync().Safe();
 
 			if (lavalinkResult.Tracks?.Count() == 0)
@@ -119,7 +129,7 @@ namespace Lana.Modules
 			if (lavalinkResult.LoadResultType == LavalinkLoadResultType.TrackLoaded)
 			{
 				var track = lavalinkResult.Tracks.First();
-				var index = await this.player.EnqueueAsync(new TrackInfo(ctx.Channel, ctx.User, track));
+				var index = await this.Player.EnqueueAsync(new TrackInfo(ctx.Channel, ctx.User, track));
 				await ctx.RespondAsync($":headphones: A música **{Formatter.Sanitize(track.Title)}** ({Formatter.Sanitize(track.Length.Format())}) pedida por {ctx.User.Mention} foi adicionada à fila! `[#{index}]`");
 			}
 			else if (lavalinkResult.LoadResultType == LavalinkLoadResultType.PlaylistLoaded)
@@ -130,7 +140,7 @@ namespace Lana.Modules
 				foreach (var it in lavalinkResult.Tracks)
 				{
 					count++;
-					tasks.Add(this.player.EnqueueAsync(new TrackInfo(ctx.Channel, ctx.User, it)));
+					tasks.Add(this.Player.EnqueueAsync(new TrackInfo(ctx.Channel, ctx.User, it)));
 				}
 
 				// TODO pagination pra ver as musicas
@@ -143,24 +153,24 @@ namespace Lana.Modules
 				return;
 			}
 
-			if (this.player.NowPlaying == null)
-				await this.player.NextAsync();
+			if (this.Player.NowPlaying == null)
+				await this.Player.NextAsync();
 		}
 
 		[Command, Aliases("np")]
 		public async Task NowPlaying(CommandContext ctx)
 		{
-			if (this.player.NowPlaying == null)
+			if (this.Player.NowPlaying == null)
 				await ctx.RespondAsync(":x: Nenhuma música está sendo tocada neste momento!");
 			else
 			{
-				var nowplaying = this.player.NowPlaying;
+				var nowplaying = this.Player.NowPlaying;
 				var imageURL = $"https://img.youtube.com/vi/{nowplaying.Track.Uri.ToString().Replace("https://www.youtube.com/watch?v=", "")}/maxresdefault.jpg";
 
 				await ctx.RespondAsync(embed: new DiscordEmbedBuilder()
 					.WithTitle(":headphones: Tocando agora")
 					.WithDescription(Formatter.Bold(Formatter.Sanitize(nowplaying.Track.Title)) + " por " + Formatter.Sanitize(nowplaying.Track.Author))
-					.AddField("Posição e Duração", this.player.PlaybackPosition.ToString("mm\\:ss") + " — " + nowplaying.Track.Length.ToString("mm\\:ss"), true)
+					.AddField("Posição e Duração", this.Player.PlaybackPosition.ToString("mm\\:ss") + " — " + nowplaying.Track.Length.ToString("mm\\:ss"), true)
 					.AddField("Pedido por", nowplaying.User.Mention, true)
 					.AddField("Canal", nowplaying.Channel.Mention, true)
 					.WithColor(DiscordColor.Blurple)
@@ -170,7 +180,7 @@ namespace Lana.Modules
 		[Command, Aliases("q", "fila")]
 		public async Task Queue(CommandContext ctx)
 		{
-			if (this.player.NowPlaying == null)
+			if (this.Player.NowPlaying == null)
 			{
 				await ctx.RespondAsync(":x: Nenhuma música está sendo tocada neste momento!");
 				return;
@@ -181,7 +191,7 @@ namespace Lana.Modules
 			var interactivity = ctx.Client.GetInteractivity();
 			var pages = new List<Page>();
 
-			foreach (var track in this.player.GetQueue())
+			foreach (var track in this.Player.GetQueue())
 			{
 				if (description.Length > 1500)
 				{
@@ -198,7 +208,7 @@ namespace Lana.Modules
 
 				string prefix;
 
-				if (this.player.NowPlaying == track)
+				if (this.Player.NowPlaying == track)
 					prefix = Emotes.MsPlay;
 				else
 					prefix = $"**`[#{offset + 1}:00]`**";
