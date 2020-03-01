@@ -191,7 +191,10 @@ namespace Lana.Modules
 			var interactivity = ctx.Client.GetInteractivity();
 			var pages = new List<Page>();
 
-			foreach (var track in this.Player.GetQueue())
+			var queue = this.Player.GetQueue().ToList();
+			queue.Insert(0, this.Player.NowPlaying);
+
+			foreach (var it in queue)
 			{
 				if (description.Length > 1500)
 				{
@@ -207,17 +210,28 @@ namespace Lana.Modules
 				}
 
 				string prefix;
+				var suffix = string.Empty;
 
-				if (this.Player.NowPlaying == track)
-					prefix = Emotes.MsPlay;
+				if (this.Player.NowPlaying == it)
+				{
+					prefix = string.Concat(Emotes.MsPlay, " **");
+					suffix = "**";
+				}
 				else
-					prefix = $"**`[#{offset + 1}:00]`**";
+					prefix = $"**`[{++offset}]`**";
 
-				description += $"{prefix} {Formatter.Bold(Formatter.Sanitize(track.Track.Title.StrTruncate(34)))}" +
-					$" pedido por {track.User.Mention} (`{track.Track.Length.Format()}`)\n";
-
-				offset++;
+				description += $"{prefix} {Formatter.MaskedUrl(it.Track.Title.StrTruncate(38).SanetizeEx(), it.Track.Uri)}" +
+					$" pedido por {it.User.Mention} (`{it.Track.Length.Format()}`){suffix}\n";
 			}
+
+			if(!string.IsNullOrEmpty(description))
+				pages.Add(new Page
+				{
+					Embed = new DiscordEmbedBuilder()
+							.WithColor(DiscordColor.Blurple)
+							.WithAuthor("Fila de Músicas", iconUrl: ctx.Client.CurrentUser.AvatarUrl)
+							.WithDescription(description)
+				});
 
 			if (pages.Count > 1)
 				await interactivity.SendPaginatedMessageAsync(ctx.Channel, ctx.User, pages);
