@@ -29,7 +29,7 @@ namespace Lana.Entities.Lavalink
 
 		public bool Equals(TrackInfo other)
 		{
-			if (ReferenceEquals(other, null))
+			if (other is null)
 				return false;
 
 			if (ReferenceEquals(other, this))

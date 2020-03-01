@@ -40,4 +40,11 @@ public static class DotNetExtensions
 		return def;
 	}
 
+	public static string StrTruncate(this string text, int maxLimit = 12)
+	{
+		if (text.Length < maxLimit)
+			return text;
+
+		return $"{text.Substring(0, text.Length - 3)}...";
+	}
 }

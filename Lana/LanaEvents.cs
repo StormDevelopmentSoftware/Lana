@@ -43,20 +43,19 @@ namespace Lana
 
 			if (guild == null)
 			{
-				Console.ForegroundColor = ConsoleColor.Magenta;
-				Console.Write("[LANA]");
-				Console.ForegroundColor = ConsoleColor.Red;
-				Console.WriteLine(" Não foi possível determinar a guilda de moderação.");
-				Console.ResetColor();
+				Console.ForegroundColor = ConsoleColor.DarkMagenta;
+				Console.Write("[LanaBot/Moderation] ");
+				Console.ForegroundColor = ConsoleColor.Yellow;
+				Console.WriteLine("Esse bot está executando fora da guild de moderação. ");
 				return Task.CompletedTask;
 			}
 
 			this.CurrentLogChannel = guild.GetChannel(LogChannelId);
 
 			Console.ForegroundColor = ConsoleColor.Magenta;
-			Console.Write("[LANA]");
+			Console.Write("[LanaBot/Moderation] ");
 			Console.ForegroundColor = ConsoleColor.Red;
-			Console.WriteLine($" Guild de moderação reconhecida: {guild.Name}: #{this.CurrentLogChannel.Name}");
+			Console.WriteLine($"Guild de moderação detectada: {guild.Name} ({guild.Id}): #{this.CurrentLogChannel.Name}");
 			Console.ResetColor();
 
 			return Task.CompletedTask;

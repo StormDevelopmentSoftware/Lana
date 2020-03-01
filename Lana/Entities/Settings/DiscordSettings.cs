@@ -42,7 +42,7 @@ namespace Lana.Entities.Settings
 				HttpTimeout = this.HttpTimeout,
 				ReconnectIndefinitely = this.ReconnectIndefinitely,
 
-#if DEBUG
+#if DEBUG && USING_INTERNAL_LOGGER
 				LogLevel = LogLevel.Debug,
 				UseInternalLogHandler = true
 #endif

@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -16,321 +17,207 @@ using DSharpPlus.Lavalink.EventArgs;
 using DSharpPlus.Net;
 using Lana.Attributes;
 using Lana.Entities.Lavalink;
+using Lana.Entities.Music;
+using Lana.Services;
 
 namespace Lana.Modules
 {
-    [RequireGuild]
-    public class MusicModule : BaseCommandModule
-    {
-        private LavalinkNodeConnection node;
-        private LavalinkGuildConnection connection;
-        private ConcurrentQueue<TrackInfo> tracks;
-        private TrackInfo currentTrack;
-        private LavalinkConfiguration config;
-        private LanaBot bot;
+	[RequireGuild, ModuleLifespan(ModuleLifespan.Transient)]
+	public class MusicModule : BaseCommandModule
+	{
+		private MusicService service;
+		private MusicPlayer player;
 
-        public MusicModule(LanaBot bot)
-        {
-            this.bot = bot;
-            this.tracks = new ConcurrentQueue<TrackInfo>();
-            this.currentTrack = default;
-            this.bot.Lavalink.NodeDisconnected += this.NotifyNodeDisconnected;
-            this.UpdateConfiguration();
-        }
+		public MusicModule(MusicService service)
+		{
+			this.service = service;
+		}
 
-        public void UpdateConfiguration()
-            => this.config = new LavalinkConfiguration(this.bot.Configuration.Lavalink.Build());
+		async Task NowPlaying(TrackInfo ctx)
+		{
+			var track = ctx.Track;
+			await ctx.Channel.SendMessageAsync($":notes: Tocando agora **{Formatter.Sanitize(track.Title)}** " +
+				$"(`{track.Length.Format()}`)");
+		}
 
-        [Command, Aliases("np")]
-        public async Task NowPlaying(CommandContext ctx)
-        {
-            if (currentTrack != null)
-            {
-                var imageURL = $"https://img.youtube.com/vi/{currentTrack.Track.Uri.ToString().Replace("https://www.youtube.com/watch?v=", "")}/maxresdefault.jpg";
-                await ctx.RespondAsync(embed: new DiscordEmbedBuilder()
-                    .WithTitle(":headphones: Tocando agora")
-                    .AddField("Título e autor", Formatter.Bold(Formatter.Sanitize(currentTrack.Track.Title)) + " por " + Formatter.Sanitize(currentTrack.Track.Author), true)
-                    .AddField("Posição e Duração", connection.CurrentState.PlaybackPosition.ToString("mm\\:ss") + " — " + currentTrack.Track.Length.ToString("mm\\:ss"), false)
-                    .AddField("Pedido por", currentTrack.User.Mention, true)
-                    .AddField("Canal", currentTrack.Channel.Mention, true)
-                    .WithColor(DiscordColor.Blurple)
-                    .WithThumbnailUrl(imageURL));
+		public override async Task BeforeExecutionAsync(CommandContext ctx)
+		{
+			var mbr = ctx.Member.VoiceState?.Channel;
+			var vst = ctx.Guild.CurrentMember.VoiceState?.Channel;
 
-            }
-            else await ctx.RespondAsync(":x: Nenhuma música está sendo tocada neste momento!");
-        }
-        [Command, Aliases("q", "fila")]
-        public async Task Queue(CommandContext ctx)
-        {
-            if (currentTrack == null)
-            {
-                await ctx.RespondAsync(":x: Nenhuma música está sendo tocada neste momento!");
-                return;
-            }
+			if (this.player == null)
+				this.player = await this.service.GetOrCreateAsync(ctx.Guild);
 
-            var interactivity = ctx.Client.GetInteractivity();
+			if (this.player != null)
+				this.player.NowPlayingObserver = this.NowPlaying;
 
-            var sb = new StringBuilder();
+			if (!this.player.IsConnected)
+			{
+				if (mbr == null)
+					return;
 
-            sb.Append($"[**`▶️ AGORA`**] {Formatter.Bold(Formatter.Sanitize(currentTrack.Track.Title))} pedido por {currentTrack.User.Mention} (`{currentTrack.Track.Length.Format()}`)\n");
+				if (vst == null)
+					await this.player.InitializeAsync(mbr);
+			}
 
-            int index = 1;
-            foreach (var track in tracks)
-            {
-                sb.Append($"[**`#{index}`**] {Formatter.Bold(Formatter.Sanitize(track.Track.Title))} pedido por {track.User.Mention} (`{track.Track.Length.Format()}`)\n");
-                index++;
-            }
-            var embed = new DiscordEmbedBuilder()
-                .WithColor(DiscordColor.Blurple)
-                .WithAuthor("Fila de Músicas", iconUrl: ctx.Client.CurrentUser.AvatarUrl);
+			if (this.player != null && this.player.Connection == null)
+				await this.player.InitializeAsync(mbr);
+		}
 
-            var pages = interactivity.GeneratePagesInEmbed(sb.ToString(), SplitType.Line, embed);
-            await interactivity.SendPaginatedMessageAsync(ctx.Channel, ctx.User, pages);
-        }
+		[Command, RequireVoiceChannel, RequireSameVoiceChannel, RequireRoles(RoleCheckMode.Any, "Administrador")]
+		public async Task Clear(CommandContext ctx)
+		{
+			await this.player.ClearQueueAsync();
+			await ctx.RespondAsync(":white_check_mark: Fila limpa. A música atual irá continuar a tocar.");
+		}
 
-        [Command, RequireVoiceChannel, RequireSameVoiceChannel, RequireRoles(RoleCheckMode.Any, "Administrador")]
-        public async Task Clear(CommandContext ctx)
-        {
-            tracks.Clear();
-            await ctx.RespondAsync(":white_check_mark: Fila limpa. A música atual irá continuar a tocar.");
-        }
+		[Command, RequireVoiceChannel, RequireSameVoiceChannel, Priority(0)]
+		public async Task Play(CommandContext ctx, [RemainingText] string search)
+		{
+			var waiting = await ctx.RespondAsync(embed: new DiscordEmbedBuilder()
+				.WithDescription($"{Emotes.LoadingYellow} Pesquisando músicas..."));
 
-        [Command, RequireVoiceChannel, RequireSameVoiceChannel, Priority(0)]
-        public async Task Play(CommandContext ctx, [RemainingText] string search)
-        {
-            var lpWait = await ctx.RespondAsync(embed: new DiscordEmbedBuilder()
-                .WithAuthor("Obtendo pesquisa de músicas...", iconUrl: "https://i.imgur.com/HACGw6c.gif"));
+			var lavalinkResult = await this.service.GetTracksAsync(search);
 
-            await ctx.TriggerTypingAsync();
+			if (lavalinkResult.Tracks?.Count() == 0)
+			{
+				await waiting.DeleteAsync().Safe();
+				await ctx.RespondAsync($"{ctx.User.Mention} :x: Nenhum resultado encontrado para pesquisa!");
+				return;
+			}
 
-            var response = await this.node.Rest.GetTracksAsync(search, LavalinkSearchType.Youtube);
+			var selector = new TrackSelector(ctx, lavalinkResult.Tracks, search);
+			await waiting.DeleteAsync().Safe();
+			var selectorResult = await selector.SelectAsync();
 
-            if (response.Tracks?.Count() == 0)
-            {
-                await lpWait.DeleteAsync().Safe();
-                await ctx.RespondAsync($"{ctx.User.Mention} :x: Nenhum resultado encontrado para pesquisa!");
-                return;
-            }
+			if (selectorResult.Status == TrackSelectorStatus.Cancelled)
+				return;
+			else if (selectorResult.Status == TrackSelectorStatus.TimedOut)
+			{
+				await ctx.RespondAsync($"{ctx.User.Mention} :x: Tempo limite esgotado!");
+				return;
+			}
 
-            var selector = new TrackSelector(ctx, response.Tracks, search);
-            var result = await selector.SelectAsync();
-            await lpWait.DeleteAsync().Safe();
+			var result = selectorResult.Result;
+			var index = await player.EnqueueAsync(result);
+			await ctx.RespondAsync($":headphones: A música **{Formatter.Sanitize(result.Track.Title)}** ({Formatter.Sanitize(result.Track.Length.Format())}) pedida por {ctx.User.Mention} foi adicionada à fila! `[#{index}]`");
 
-            if (result.Status == TrackSelectorStatus.Cancelled)
-            {
-                return;
-            }
-            else if (result.Status == TrackSelectorStatus.TimedOut)
-            {
-                await ctx.RespondAsync($"{ctx.User.Mention} :x: Tempo limite esgotado!");
-                return;
-            }
+			if (this.player.NowPlaying == null)
+				await this.player.NextAsync();
+		}
 
-            var pos = this.tracks.Count + 1;
-            var selectedTrack = result.CurrentTrack.Track;
-            this.tracks.Enqueue(result.CurrentTrack);
+		[Command, RequireVoiceChannel, RequireSameVoiceChannel, Priority(1)]
+		public async Task Play(CommandContext ctx, Uri url)
+		{
+			var waiting = await ctx.RespondAsync(embed: new DiscordEmbedBuilder()
+				.WithDescription($"{Emotes.LoadingYellow} Obtendo músicas..."));
 
-            await ctx.RespondAsync($":headphones: A música **{Formatter.Sanitize(selectedTrack.Title)}** ({Formatter.Sanitize(selectedTrack.Length.Format())}) pedida por {ctx.User.Mention} foi adicionada à fila! `[#{pos}]`");
+			var lavalinkResult = await this.service.GetTracksAsync(url);
+			await waiting.DeleteAsync().Safe();
 
-            if (this.currentTrack == null)
-                await this.NotifyNextTrackAsync();
+			if (lavalinkResult.Tracks?.Count() == 0)
+			{
+				await ctx.RespondAsync($"{ctx.User.Mention} :x: Url fornecida é inválida ou o link está quebrado!");
+				return;
+			}
 
-            //if (op == 0)
-            //{
-            //    await ctx.RespondAsync(ctx.User.Mention, embed: new DiscordEmbedBuilder()
-            //        .WithColor(DiscordColor.Blurple)
-            //        .WithDescription($":notes: Tocando agora **{Formatter.Sanitize(selectedTrack.Title)}** ({Formatter.Sanitize(selectedTrack.Length.Format())})"));
-            //}
-            //else if (op == 1)
-            //{
-            //    await ctx.RespondAsync(ctx.User.Mention, embed: new DiscordEmbedBuilder()
-            //        .WithColor(DiscordColor.Blurple)
-            //        .WithDescription($":headphones: A música **{Formatter.Sanitize(selectedTrack.Title)}** ({Formatter.Sanitize(selectedTrack.Length.Format())}) foi adicionada à fila! `[#{pos}]`"));
-            //}
-            //else
-            //{
-            //    await ctx.RespondAsync(ctx.User.Mention, embed: new DiscordEmbedBuilder()
-            //        .WithColor(DiscordColor.Red)
-            //        .WithDescription($"{ctx.User.Mention} :x: Lavalink não disponível!"));
-            //}
-        }
+			if (lavalinkResult.LoadResultType == LavalinkLoadResultType.TrackLoaded)
+			{
+				var track = lavalinkResult.Tracks.First();
+				var index = await this.player.EnqueueAsync(new TrackInfo(ctx.Channel, ctx.User, track));
+				await ctx.RespondAsync($":headphones: A música **{Formatter.Sanitize(track.Title)}** ({Formatter.Sanitize(track.Length.Format())}) pedida por {ctx.User.Mention} foi adicionada à fila! `[#{index}]`");
+			}
+			else if (lavalinkResult.LoadResultType == LavalinkLoadResultType.PlaylistLoaded)
+			{
+				var tasks = new List<Task>();
+				var count = 0;
 
-        [Command, RequireVoiceChannel, RequireSameVoiceChannel, Priority(1)]
-        public async Task Play(CommandContext ctx, Uri url)
-        {
-            var lpWait = await ctx.RespondAsync(embed: new DiscordEmbedBuilder()
-                .WithAuthor("Obtendo pesquisa de músicas...", iconUrl: "https://i.imgur.com/HACGw6c.gif"));
+				foreach (var it in lavalinkResult.Tracks)
+				{
+					count++;
+					tasks.Add(this.player.EnqueueAsync(new TrackInfo(ctx.Channel, ctx.User, it)));
+				}
 
-            await ctx.TriggerTypingAsync();
+				// TODO pagination pra ver as musicas
+				await Task.WhenAll(tasks);
+				await ctx.RespondAsync($":headphones: Foram adicionada(s) {count:#,#} músicas na fila.");
+			}
+			else
+			{
+				await ctx.RespondAsync($"{ctx.User.Mention} :x: Url fornecida é inválida ou o link está quebrado!");
+				return;
+			}
 
-            var response = await this.node.Rest.GetTracksAsync(url);
+			if (this.player.NowPlaying == null)
+				await this.player.NextAsync();
+		}
 
-            if (response.Tracks?.Count() == 0)
-            {
-                await lpWait.DeleteAsync().Safe();
-                await ctx.RespondAsync(ctx.User.Mention, embed: new DiscordEmbedBuilder()
-                    .WithColor(DiscordColor.Red)
-                    .WithDescription($"[`{response.LoadResultType}`] URL fornecida é inválida!"));
+		[Command, Aliases("np")]
+		public async Task NowPlaying(CommandContext ctx)
+		{
+			if (this.player.NowPlaying == null)
+				await ctx.RespondAsync(":x: Nenhuma música está sendo tocada neste momento!");
+			else
+			{
+				var nowplaying = this.player.NowPlaying;
+				var imageURL = $"https://img.youtube.com/vi/{nowplaying.Track.Uri.ToString().Replace("https://www.youtube.com/watch?v=", "")}/maxresdefault.jpg";
 
-                return;
-            }
+				await ctx.RespondAsync(embed: new DiscordEmbedBuilder()
+					.WithTitle(":headphones: Tocando agora")
+					.WithDescription(Formatter.Bold(Formatter.Sanitize(nowplaying.Track.Title)) + " por " + Formatter.Sanitize(nowplaying.Track.Author))
+					.AddField("Posição e Duração", this.player.PlaybackPosition.ToString("mm\\:ss") + " — " + nowplaying.Track.Length.ToString("mm\\:ss"), true)
+					.AddField("Pedido por", nowplaying.User.Mention, true)
+					.AddField("Canal", nowplaying.Channel.Mention, true)
+					.WithColor(DiscordColor.Blurple)
+					.WithThumbnailUrl(imageURL));
+			}
+		}
+		[Command, Aliases("q", "fila")]
+		public async Task Queue(CommandContext ctx)
+		{
+			if (this.player.NowPlaying == null)
+			{
+				await ctx.RespondAsync(":x: Nenhuma música está sendo tocada neste momento!");
+				return;
+			}
 
-            await lpWait.DeleteAsync().Safe();
+			var offset = 0;
+			var description = string.Empty;
+			var interactivity = ctx.Client.GetInteractivity();
+			var pages = new List<Page>();
 
-            if (response.LoadResultType == LavalinkLoadResultType.TrackLoaded)
-            {
-                var selectedTrack = response.Tracks.First();
-                var pos = this.tracks.Count;
-                this.tracks.Enqueue(new TrackInfo(ctx.Channel, ctx.User, selectedTrack));
-                await ctx.RespondAsync($":headphones: A música **{Formatter.Sanitize(selectedTrack.Title)}** ({Formatter.Sanitize(selectedTrack.Length.Format())}) pedida por {ctx.User.Mention} foi adicionada à fila! `[#{pos}]`");
-            }
-            else if (response.LoadResultType == LavalinkLoadResultType.PlaylistLoaded)
-            {
-                var count = 0;
+			foreach (var track in this.player.GetQueue())
+			{
+				if (description.Length > 1500)
+				{
+					pages.Add(new Page
+					{
+						Embed = new DiscordEmbedBuilder()
+							.WithColor(DiscordColor.Blurple)
+							.WithAuthor("Fila de Músicas", iconUrl: ctx.Client.CurrentUser.AvatarUrl)
+							.WithDescription(description)
+					});
 
-                foreach (var selectedTrack in response.Tracks)
-                {
-                    count++;
-                    this.tracks.Enqueue(new TrackInfo(ctx.Channel, ctx.User, selectedTrack));
-                }
+					description = string.Empty;
+				}
 
-                await ctx.RespondAsync($":headphones: Foram adicionada(s) {count:#,#} músicas na fila."); // TODO pagination pra ver as musicas
-            }
-            else
-            {
-                await ctx.RespondAsync(ctx.User.Mention, embed: new DiscordEmbedBuilder()
-                    .WithColor(DiscordColor.Red)
-                    .WithDescription($"[`{response.LoadResultType}`] URL fornecida é inválida!"));
+				string prefix;
 
-                return;
-            }
+				if (this.player.NowPlaying == track)
+					prefix = Emotes.MsPlay;
+				else
+					prefix = $"**`[#{offset + 1}:00]`**";
 
-            if (this.currentTrack == null)
-                await this.NotifyNextTrackAsync();
-        }
+				description += $"{prefix} {Formatter.Bold(Formatter.Sanitize(track.Track.Title.StrTruncate(34)))}" +
+					$" pedido por {track.User.Mention} (`{track.Track.Length.Format()}`)\n";
 
-        protected async Task NotifyTrackFinished(TrackFinishEventArgs e)
-        {
-            await Task.Delay(1000);
-            await this.NotifyNextTrackAsync();
-        }
+				offset++;
+			}
 
-        protected async Task NotifyNextTrackAsync()
-        {
-            if (this.tracks.TryDequeue(out this.currentTrack))
-            {
-                await this.connection.PlayAsync(this.currentTrack.Track);
-
-                try
-                {
-                    var selectedTrack = this.currentTrack.Track;
-
-                    await this.currentTrack.Channel.SendMessageAsync($":notes: Tocando agora **{Formatter.Sanitize(selectedTrack.Title)}** ({Formatter.Sanitize(selectedTrack.Length.Format())})");
-                    await Task.Delay(250);
-
-                }
-                catch { }
-            }
-            else
-            {
-                await this.connection.DisconnectAsync();
-            }
-        }
-
-        //protected async Task<int> PlayTrackAsync(TrackInfo track)
-        //{
-        //    if (this.connection == null)
-        //        return -1;
-
-        //    if (this.currentTrack != null)
-        //    {
-        //        this.tracks.Enqueue(track);
-        //        return 1;
-        //    }
-        //    else
-        //    {
-        //        this.currentTrack = track;
-        //        await this.NotifyNextTrackAsync();
-        //        return 0;
-        //    }
-        //}
-
-        protected Task NotifyNodeDisconnected(NodeDisconnectedEventArgs e)
-        {
-            if (e.LavalinkNode == this.node)
-                this.connection = default;
-
-            return Task.CompletedTask;
-        }
-
-        public override async Task BeforeExecutionAsync(CommandContext ctx)
-        {
-            this.UpdateConfiguration();
-
-            var lavalink = ctx.Client.GetLavalink();
-
-            if (this.node == null || !this.node.IsConnected)
-                this.node = lavalink.GetNodeConnection(this.bot.Configuration.Lavalink.RestEndpoint);
-
-            if (this.node == null || !this.node.IsConnected)
-                this.node = await lavalink.ConnectAsync(this.config);
-
-            if (this.node == null || !this.node.IsConnected)
-            {
-                var objRef = lavalink.GetType().GetProperty("ConnectedNodes",
-                    BindingFlags.NonPublic | BindingFlags.Instance).GetValue(lavalink);
-
-                ((ConcurrentDictionary<ConnectionEndpoint, LavalinkNodeConnection>)objRef)
-                    .TryRemove(this.bot.Configuration.Lavalink.RestEndpoint, out var _);
-
-                this.node = await lavalink.ConnectAsync(this.config);
-            }
-
-            var botVoiceChannel = ctx.Guild.CurrentMember.VoiceState?.Channel;
-            var memberVoiceChannel = ctx.Member.VoiceState?.Channel;
-
-            //if (botVoiceChannel == null && memberVoiceChannel != null)
-            //{
-            //    this.connection = await this.node.ConnectAsync(memberVoiceChannel);
-            //}
-            //else if (botVoiceChannel != null)
-            //    this.connection = this.node.GetConnection(ctx.Guild);
-            //else
-            //    this.connection = await this.node.ConnectAsync(memberVoiceChannel);
-
-            //if (this.connection != null && !this.connection.IsConnected)
-            //{
-            //    var objRef = this.node.GetType().GetProperty("ConnectedGuilds",
-            //        BindingFlags.NonPublic | BindingFlags.Instance).GetValue(this.node);
-
-            //    ((ConcurrentDictionary<ulong, LavalinkGuildConnection>)objRef)
-            //        .TryRemove(ctx.Guild.Id, out var _);
-
-            //    this.connection = await this.node.ConnectAsync(memberVoiceChannel);
-            //}
-
-            if (this.connection == null || !this.connection.IsConnected)
-            {
-                this.connection = this.node.GetConnection(ctx.Guild);
-
-                if (this.connection != null)
-                    this.connection.PlaybackFinished += this.NotifyTrackFinished;
-            }
-
-            if (this.connection == null || !this.connection.IsConnected)
-            {
-                if (botVoiceChannel == null || (botVoiceChannel != null && memberVoiceChannel == botVoiceChannel))
-                {
-                    var objRef = this.node.GetType().GetProperty("ConnectedGuilds",
-                        BindingFlags.NonPublic | BindingFlags.Instance).GetValue(this.node);
-
-                    ((ConcurrentDictionary<ulong, LavalinkGuildConnection>)objRef)
-                        .TryRemove(ctx.Guild.Id, out var _);
-
-                    this.connection = await this.node.ConnectAsync(memberVoiceChannel);
-                    this.connection.PlaybackFinished += this.NotifyTrackFinished;
-                }
-            }
-        }
-    }
+			if (pages.Count > 1)
+				await interactivity.SendPaginatedMessageAsync(ctx.Channel, ctx.User, pages);
+			else
+				await ctx.RespondAsync(embed: pages[0].Embed);
+		}
+	}
 }

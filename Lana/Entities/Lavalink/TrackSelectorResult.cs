@@ -3,6 +3,6 @@
 	public class TrackSelectorResult
 	{
 		public TrackSelectorStatus Status { get; set; }
-		public TrackInfo CurrentTrack { get; set; }
+		public TrackInfo Result { get; set; }
 	}
 }

@@ -55,7 +55,7 @@ namespace Lana.Entities.Lavalink
 			{
 				if (this.count == 1)
 				{
-					result.CurrentTrack = new TrackInfo(this.context.Channel, this.context.User, this.tracks.First());
+					result.Result = new TrackInfo(this.context.Channel, this.context.User, this.tracks.First());
 					result.Status = TrackSelectorStatus.Success;
 					return result;
 				}
@@ -107,7 +107,7 @@ namespace Lana.Entities.Lavalink
 					var option = NumberMappingReversed[response.Result.Emoji];
 					var track = this.tracks.ElementAt(option - 1);
 					result.Status = TrackSelectorStatus.Success;
-					result.CurrentTrack = new TrackInfo(this.context.Channel, this.context.User, track);
+					result.Result = new TrackInfo(this.context.Channel, this.context.User, track);
 					return result;
 				}
 			}

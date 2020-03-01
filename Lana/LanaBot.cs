@@ -7,6 +7,7 @@ using DSharpPlus.Interactivity;
 using DSharpPlus.Interactivity.Enums;
 using DSharpPlus.Lavalink;
 using Lana.Entities;
+using Lana.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Lana
@@ -40,11 +41,12 @@ namespace Lana
 			this.Services = new ServiceCollection()
 				.AddSingleton(this)
 				.AddSingleton(new LanaEvents(this))
+				.AddSingleton(new MusicService(this))
 				.BuildServiceProvider(true);
 
 			this.CommandsNext = this.Discord.UseCommandsNext(new CommandsNextConfiguration
 			{
-				StringPrefixes = ImmutableArray.Create("-", "l!"),
+				StringPrefixes = ImmutableArray.Create("-", "l!", "s!"),
 				EnableDms = false,
 				Services = this.Services
 			});
@@ -56,6 +58,7 @@ namespace Lana
 		public async Task InitializeAsync()
 		{
 			await this.Services.GetService<LanaEvents>().InitializeAsync();
+			await this.Services.GetService<MusicService>().InitializeAsync();
 			await this.Discord.ConnectAsync();
 		}
 
