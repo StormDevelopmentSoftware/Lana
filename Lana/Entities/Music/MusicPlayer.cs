@@ -96,6 +96,8 @@ namespace Lana.Entities.Music
 
 			await this.ClearQueueAsync();
 			await this.Connection.DisconnectAsync();
+
+			this.NowPlaying = default;
 			this.Connection.PlaybackFinished -= this.NotifyTrackFinished;
 			this.Connection = default;
 		}
