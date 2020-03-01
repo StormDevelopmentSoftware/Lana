@@ -11,7 +11,7 @@ namespace Lana
 		static readonly CancellationTokenSource Cts
 			= new CancellationTokenSource();
 
-		static async Task Main(string[] args)
+		static async Task Main(string[] _)
 		{
 			Console.OutputEncoding = Encoding.UTF8;
 

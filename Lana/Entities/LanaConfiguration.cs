@@ -38,29 +38,25 @@ namespace Lana.Entities
 
 			if (!file.Exists)
 			{
-				using (var sw = file.CreateText())
-				{
-					sw.WriteLine(JsonConvert.SerializeObject(result, Formatting.Indented, settings));
-					sw.Flush();
-				}
+				using var sw = file.CreateText();
+				sw.WriteLine(JsonConvert.SerializeObject(result, Formatting.Indented, settings));
+				sw.Flush();
 			}
 			else
 			{
-				using (var sr = file.OpenText())
+				using var sr = file.OpenText();
+				try
 				{
-					try
-					{
-						var json = sr.ReadToEnd();
-						result = JsonConvert.DeserializeObject<LanaConfiguration>(json, settings);
-					}
-					catch (Exception ex)
-					{
-						Console.ForegroundColor = ConsoleColor.Yellow;
-						Console.Write("[LANA] Inicialização da configuração falhou! ");
-						Console.ForegroundColor = ConsoleColor.Red;
-						Console.Write(ex);
-						Console.ResetColor();
-					}
+					var json = sr.ReadToEnd();
+					result = JsonConvert.DeserializeObject<LanaConfiguration>(json, settings);
+				}
+				catch (Exception ex)
+				{
+					Console.ForegroundColor = ConsoleColor.Yellow;
+					Console.Write("[LANA] Inicialização da configuração falhou! ");
+					Console.ForegroundColor = ConsoleColor.Red;
+					Console.Write(ex);
+					Console.ResetColor();
 				}
 			}
 
