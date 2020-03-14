@@ -20,11 +20,8 @@ namespace Lana.Modules
 	[RequireGuild, ModuleLifespan(ModuleLifespan.Transient)]
 	public class MusicModule : BaseCommandModule
 	{
-		[DontInject]
-		protected MusicService Service { get; set; }
-
-		[DontInject]
-		protected MusicPlayer Player { get; set; }
+		public MusicService Service { get; private set; }
+		public MusicPlayer Player { get; private set; }
 
 		public MusicModule(MusicService service)
 		{
@@ -237,6 +234,18 @@ namespace Lana.Modules
 				await interactivity.SendPaginatedMessageAsync(ctx.Channel, ctx.User, pages);
 			else
 				await ctx.RespondAsync(embed: pages[0].Embed);
+		}
+
+		[Command, Aliases("pular"), Description("Pula a música atual ou abre votação para pular."), RequireVoiceChannel, RequireSameVoiceChannel]
+		public async Task Skip(CommandContext ctx)
+		{
+			using (var vs = new VoteSkip(ctx, TimeSpan.FromSeconds(30d)))
+			{
+				var result = await vs.InitializeAsync();
+
+				if (result == VoteSkipResult.Success) await ctx.RespondAsync(":white_check_mark:");
+				else if (result == VoteSkipResult.Failed) await ctx.RespondAsync(":x:");
+			}
 		}
 	}
 }

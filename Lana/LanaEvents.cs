@@ -43,21 +43,12 @@ namespace Lana
 
 			if (guild == null)
 			{
-				Console.ForegroundColor = ConsoleColor.DarkMagenta;
-				Console.Write("[LanaBot/Moderation] ");
-				Console.ForegroundColor = ConsoleColor.Yellow;
-				Console.WriteLine("Esse bot está executando fora da guild de moderação. ");
+				Log.Warning<LanaEvents>("Esse bot está executando fora da guild de moderação.");
 				return Task.CompletedTask;
 			}
 
 			this.CurrentLogChannel = guild.GetChannel(LogChannelId);
-
-			Console.ForegroundColor = ConsoleColor.Magenta;
-			Console.Write("[LanaBot/Moderation] ");
-			Console.ForegroundColor = ConsoleColor.Red;
-			Console.WriteLine($"Guild de moderação detectada: {guild.Name} ({guild.Id}): #{this.CurrentLogChannel.Name}");
-			Console.ResetColor();
-
+			Log.Debug<LanaEvents>("Detectada guilda de moderação.");
 			return Task.CompletedTask;
 		}
 
@@ -128,41 +119,44 @@ namespace Lana
 				if (ex is CommandNotFoundException) return;
 				else if (ex.Message.Contains("Could not find a suitable overload for the command.")) return;
 
-				Console.ForegroundColor = ConsoleColor.DarkBlue;
-				Console.Write("[COMMANDS] ".PadRight(12));
-
-				Console.ForegroundColor = ConsoleColor.Blue;
-				Console.Write("Execução do comando falhou!\n");
-
-				var props = new Dictionary<string, string>
+				Log.SyncConsole(() =>
 				{
-					["Comando"] = ctx.Command.QualifiedName,
-					["Usuário"] = $"{ctx.User.Username}#{ctx.User.Discriminator}",
-					["Canal"] = $"#{ctx.Channel.Name}",
-					["Guild"] = ctx.Guild.Name,
-					["Descrição"] = ex.Message,
-					["Classe"] = ex.GetType().FullName,
-					["StackTrace"] = ex.StackTrace + "\n"
-				};
+					Console.ForegroundColor = ConsoleColor.DarkBlue;
+					Console.Write("[COMMANDS] ".PadRight(12));
 
-				foreach (var (key, value) in props)
-				{
-					Console.ForegroundColor = ConsoleColor.Cyan;
-					Console.Write(key.PadRight(12));
+					Console.ForegroundColor = ConsoleColor.Blue;
+					Console.Write("Execução do comando falhou!\n");
 
-					Console.ForegroundColor = ConsoleColor.Gray;
-					Console.Write(":");
+					var props = new Dictionary<string, string>
+					{
+						["Comando"] = ctx.Command.QualifiedName,
+						["Usuário"] = $"{ctx.User.Username}#{ctx.User.Discriminator}",
+						["Canal"] = $"#{ctx.Channel.Name}",
+						["Guild"] = ctx.Guild.Name,
+						["Descrição"] = ex.Message,
+						["Classe"] = ex.GetType().FullName,
+						["StackTrace"] = ex.StackTrace + "\n"
+					};
 
-					Console.ForegroundColor = ConsoleColor.DarkYellow;
-					Console.Write(" " + value);
+					foreach (var (key, value) in props)
+					{
+						Console.ForegroundColor = ConsoleColor.Cyan;
+						Console.Write(key.PadRight(12));
 
-					Console.ForegroundColor = ConsoleColor.White;
+						Console.ForegroundColor = ConsoleColor.Gray;
+						Console.Write(":");
+
+						Console.ForegroundColor = ConsoleColor.DarkYellow;
+						Console.Write(" " + value);
+
+						Console.ForegroundColor = ConsoleColor.White;
+						Console.WriteLine();
+					}
+
 					Console.WriteLine();
-				}
+				});
 
-				Console.WriteLine();
-
-				await ctx.RespondAsync($"[`{ex.GetType().Name}`] {ctx.User.Mention} :x: Um erro ocorreu durante a execução do comando.");
+				await ctx.RespondAsync($"{ctx.User.Mention} :x: Um erro ocorreu durante a execução do comando.\n>:x: {ex.GetType().Name}: {ex.Message}");
 			}
 		}
 	}

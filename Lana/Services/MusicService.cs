@@ -18,7 +18,10 @@ namespace Lana.Services
 	public class MusicService
 	{
 		protected Timer NodeTimer;
+
 		protected ConcurrentDictionary<ulong, MusicPlayer> Players { get; set; }
+		protected ConcurrentDictionary<ulong, DateTimeOffset> VoiceStateJoinTime { get; set; }
+
 		public LavalinkNodeConnection Node { get; private set; }
 		protected LavalinkExtension Lavalink { get; set; }
 		protected DiscordClient Discord { get; set; }
@@ -39,15 +42,15 @@ namespace Lana.Services
 		public Task<LavalinkLoadResult> GetTracksAsync(Uri url)
 			=> this.Node?.Rest?.GetTracksAsync(url);
 
+		public DateTimeOffset? GetJoinTimestamp(DiscordUser user) =>
+			this.VoiceStateJoinTime.TryGetValue(user.Id, out var dto) ? dto : default(DateTimeOffset?);
+
 		public Task<MusicPlayer> GetOrCreateAsync(DiscordGuild guild)
 		{
 			if (this.Players.TryGetValue(guild.Id, out var player))
 				return Task.FromResult(player);
 
-			Console.ForegroundColor = ConsoleColor.Magenta;
-			Console.Write("[LanaBot/MusicService] ");
-			Console.ForegroundColor = ConsoleColor.Yellow;
-			Console.WriteLine("Criando um novo player para a guild {0} ({1})", guild.Name, guild.Id);
+			Log.Debug<MusicService>($"Criando um novo player de musica para {guild.Name} (0x{guild.Id:x8})");
 
 			player = new MusicPlayer(guild, this.Node);
 			this.Players.AddOrUpdate(guild.Id, player, (key, old) => player);
@@ -56,12 +59,23 @@ namespace Lana.Services
 
 		public Task InitializeAsync()
 		{
-			this.Discord.Ready += this.NotifyReady;
+			this.Discord.Ready += this.OnReady;
+			this.Discord.VoiceStateUpdated += this.OnVoiceStateUpdate;
 			this.NodeTimer = new Timer(NotifyTimerTick);
 			return Task.CompletedTask;
 		}
 
-		protected Task NotifyReady(ReadyEventArgs e)
+		async Task OnVoiceStateUpdate(VoiceStateUpdateEventArgs e)
+		{
+			await Task.Yield();
+
+			if (e.After == null) // saiu do canal.
+				this.VoiceStateJoinTime.TryRemove(e.User.Id, out var _);
+			else // entrou/mudou de canal
+				this.VoiceStateJoinTime[e.User.Id] = DateTimeOffset.UtcNow;
+		}
+
+		protected Task OnReady(ReadyEventArgs e)
 		{
 			this.NodeTimer.Change(TimeSpan.Zero, TimeSpan.FromSeconds(15));
 			return Task.CompletedTask;
@@ -108,7 +122,7 @@ namespace Lana.Services
 					this.NodeTimer.Change(TimeSpan.FromMinutes(3)); // Conexão estável, não precisa atualizar rápido de mais.
 				}
 			}
-			catch(Exception ex)
+			catch (Exception ex)
 			{
 				Console.ForegroundColor = ConsoleColor.Blue;
 				Console.Write("[LanaBot/Lavalink] ");
@@ -124,7 +138,7 @@ namespace Lana.Services
 
 		protected Task NotifyNodeDisconnected(NodeDisconnectedEventArgs e)
 		{
-			if(this.Node == null)
+			if (this.Node == null)
 				this.Node.Disconnected -= this.NotifyNodeDisconnected;
 
 			this.NodeTimer.Change(TimeSpan.FromSeconds(15));

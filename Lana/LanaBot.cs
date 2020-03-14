@@ -46,7 +46,7 @@ namespace Lana
 
 			this.CommandsNext = this.Discord.UseCommandsNext(new CommandsNextConfiguration
 			{
-				StringPrefixes = ImmutableArray.Create("-", "l!", "s!"),
+				StringPrefixes = ImmutableArray.Create("-", "l!", "."),
 				EnableDms = false,
 				Services = this.Services
 			});
