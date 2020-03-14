@@ -98,8 +98,6 @@ namespace Lana.Entities.Music
 			if (e.Emoji != ThumbsUp && e.Emoji != ThumbsDown)
 				return;
 
-			// TODO aceitar voto apenas de membros no canal de voz.
-
 			var vote = new VoteSkipRecord(e.User, e.Emoji == ThumbsUp);
 
 			if(this.Compute(vote))
